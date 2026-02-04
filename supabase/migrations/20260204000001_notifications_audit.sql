@@ -5,7 +5,7 @@
 -- We need to add target_user_id and target_roles columns
 
 -- Add new columns to existing notifications table
-ALTER TABLE notifications ADD COLUMN IF NOT EXISTS target_roles TEXT[] DEFAULT NULL;
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS target_roles VARCHAR(50)[] DEFAULT NULL;
 ALTER TABLE notifications ADD COLUMN IF NOT EXISTS target_user_id UUID REFERENCES profiles(id) ON DELETE CASCADE DEFAULT NULL;
 
 -- Create indexes for new columns
@@ -29,7 +29,7 @@ CREATE POLICY "Users can read own notifications" ON notifications
   USING (
     user_id = auth.uid() OR
     target_user_id = auth.uid() OR
-    target_roles && (SELECT ARRAY[r.name]::TEXT[] FROM roles r JOIN profiles p ON p.role_id = r.id WHERE p.id = auth.uid()) OR
+    (SELECT r.name FROM roles r JOIN profiles p ON p.role_id = r.id WHERE p.id = auth.uid()) = ANY(target_roles) OR
     (target_user_id IS NULL AND target_roles IS NULL AND user_id IS NULL)
   );
 
@@ -39,7 +39,7 @@ CREATE POLICY "Users can update own notifications" ON notifications
   USING (
     user_id = auth.uid() OR
     target_user_id = auth.uid() OR
-    target_roles && (SELECT ARRAY[r.name]::TEXT[] FROM roles r JOIN profiles p ON p.role_id = r.id WHERE p.id = auth.uid())
+    (SELECT r.name FROM roles r JOIN profiles p ON p.role_id = r.id WHERE p.id = auth.uid()) = ANY(target_roles)
   );
 
 -- Users can delete their own notifications
@@ -48,7 +48,7 @@ CREATE POLICY "Users can delete own notifications" ON notifications
   USING (
     user_id = auth.uid() OR
     target_user_id = auth.uid() OR
-    target_roles && (SELECT ARRAY[r.name]::TEXT[] FROM roles r JOIN profiles p ON p.role_id = r.id WHERE p.id = auth.uid())
+    (SELECT r.name FROM roles r JOIN profiles p ON p.role_id = r.id WHERE p.id = auth.uid()) = ANY(target_roles)
   );
 
 -- Service role can insert notifications

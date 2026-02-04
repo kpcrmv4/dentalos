@@ -139,14 +139,14 @@ export default function CaseExecutePage() {
       .from('reservations')
       .select(`
         id, quantity, status, reserved_at,
-        stock_item:stock_items(
+        stock_item:stock_items!reservations_stock_item_id_fkey(
           id, lot_number, expiry_date, quantity, reserved_quantity,
           product:products(
             id, name, brand, size,
             category:categories(name)
           )
         ),
-        reserved_by:profiles(full_name)
+        reserved_by:profiles!reservations_reserved_by_fkey(full_name)
       `)
       .eq('case_id', caseId)
       .in('status', ['reserved', 'partial_used'])

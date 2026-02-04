@@ -216,7 +216,7 @@ export default function ReportsPage() {
         received_date,
         total_amount,
         supplier:suppliers(name),
-        received_by:profiles(full_name),
+        received_by:profiles!stock_receives_received_by_fkey(full_name),
         items:stock_receive_items(
           quantity,
           unit_cost,
@@ -302,10 +302,10 @@ export default function ReportsPage() {
         case_number,
         scheduled_date,
         patient:patients(full_name),
-        dentist:profiles(full_name),
+        dentist:profiles!cases_dentist_id_fkey(full_name),
         reservations(
           quantity,
-          stock_item:stock_items(
+          stock_item:stock_items!reservations_stock_item_id_fkey(
             unit_cost,
             product:products(
               name,

@@ -79,7 +79,7 @@ export default function TasksPage() {
         patient:patients!inner (
           full_name
         ),
-        dentist:profiles (
+        dentist:profiles!cases_dentist_id_fkey (
           full_name
         ),
         reservations (

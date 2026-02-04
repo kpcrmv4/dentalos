@@ -43,74 +43,33 @@ CREATE INDEX idx_oos_requests_product ON out_of_stock_requests(product_id);
 CREATE INDEX idx_oos_requests_requested_at ON out_of_stock_requests(requested_at DESC);
 
 -- -----------------------------------------------------
--- Table: purchase_orders
--- ใบสั่งซื้อ
+-- NOTE: purchase_orders table already exists in init.sql
+-- Adding missing columns only
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS purchase_orders (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  po_number VARCHAR(50) UNIQUE NOT NULL,
-  supplier_id UUID NOT NULL REFERENCES suppliers(id),
-  
-  -- Order details
-  order_date DATE DEFAULT CURRENT_DATE,
-  expected_delivery_date DATE,
-  actual_delivery_date DATE,
-  
-  -- Status
-  status VARCHAR(20) DEFAULT 'draft', -- 'draft', 'sent', 'confirmed', 'partial_received', 'received', 'cancelled'
-  
-  -- LINE integration
-  line_message_sent BOOLEAN DEFAULT false,
-  line_message_sent_at TIMESTAMPTZ,
-  line_message_id TEXT,
-  
-  -- Totals
-  subtotal DECIMAL(10,2) DEFAULT 0,
-  tax DECIMAL(10,2) DEFAULT 0,
-  total DECIMAL(10,2) DEFAULT 0,
-  
-  -- Notes
-  notes TEXT,
-  internal_notes TEXT,
-  
-  -- Tracking
-  created_by UUID NOT NULL REFERENCES profiles(id),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
 
-CREATE INDEX idx_po_status ON purchase_orders(status);
-CREATE INDEX idx_po_supplier ON purchase_orders(supplier_id);
-CREATE INDEX idx_po_expected_delivery ON purchase_orders(expected_delivery_date);
+-- Add missing columns to purchase_orders if not exist
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS line_message_sent BOOLEAN DEFAULT false;
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS line_message_sent_at TIMESTAMPTZ;
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS line_message_id TEXT;
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS subtotal DECIMAL(10,2) DEFAULT 0;
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS tax DECIMAL(10,2) DEFAULT 0;
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS internal_notes TEXT;
+
+-- Skip table creation (already exists in init.sql)
+-- CREATE TABLE IF NOT EXISTS purchase_orders (
+-- Indexes (use IF NOT EXISTS pattern)
+CREATE INDEX IF NOT EXISTS idx_po_status ON purchase_orders(status);
+CREATE INDEX IF NOT EXISTS idx_po_supplier ON purchase_orders(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_po_expected_at ON purchase_orders(expected_at);
 
 -- -----------------------------------------------------
--- Table: purchase_order_items
--- รายการสินค้าในใบสั่งซื้อ
+-- NOTE: po_items table already exists in init.sql
+-- Adding missing columns only
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS purchase_order_items (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  purchase_order_id UUID NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
-  product_id UUID NOT NULL REFERENCES products(id),
-  
-  -- Quantities
-  quantity_ordered INTEGER NOT NULL,
-  quantity_received INTEGER DEFAULT 0,
-  
-  -- Pricing
-  unit_price DECIMAL(10,2),
-  total_price DECIMAL(10,2),
-  
-  -- Linkage to OOS request
-  out_of_stock_request_id UUID REFERENCES out_of_stock_requests(id),
-  
-  -- Notes
-  notes TEXT,
-  
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
 
-CREATE INDEX idx_po_items_po ON purchase_order_items(purchase_order_id);
-CREATE INDEX idx_po_items_product ON purchase_order_items(product_id);
+-- Add missing columns to po_items if not exist
+ALTER TABLE po_items ADD COLUMN IF NOT EXISTS out_of_stock_request_id UUID REFERENCES out_of_stock_requests(id);
+ALTER TABLE po_items ADD COLUMN IF NOT EXISTS total_price DECIMAL(10,2);
 
 -- -----------------------------------------------------
 -- Table: line_settings
@@ -307,7 +266,7 @@ BEGIN
   
   -- Create PO
   INSERT INTO purchase_orders (
-    po_number, supplier_id, expected_delivery_date,
+    po_number, supplier_id, expected_at,
     notes, status, created_by
   ) VALUES (
     v_po_number, p_supplier_id, p_expected_delivery_date,
@@ -327,9 +286,9 @@ BEGIN
     WHERE osr.id = ANY(p_request_ids)
       AND osr.status = 'pending'
   LOOP
-    -- Add to PO items
-    INSERT INTO purchase_order_items (
-      purchase_order_id, product_id, quantity_ordered,
+    -- Add to PO items (using po_items table from init.sql)
+    INSERT INTO po_items (
+      po_id, product_id, quantity_ordered,
       unit_price, total_price, out_of_stock_request_id
     ) VALUES (
       v_po_id, v_request.product_id, v_request.quantity_needed,
@@ -384,7 +343,7 @@ BEGIN
   SELECT 
     osr.id,
     c.case_number,
-    c.patient_name,
+    pat.full_name AS patient_name,
     p.name AS product_name,
     p.ref_code AS product_ref_code,
     s.name AS supplier_name,
@@ -395,6 +354,7 @@ BEGIN
     EXTRACT(DAY FROM NOW() - osr.requested_at)::INTEGER AS days_pending
   FROM out_of_stock_requests osr
   JOIN cases c ON c.id = osr.case_id
+  JOIN patients pat ON pat.id = c.patient_id
   JOIN products p ON p.id = osr.product_id
   JOIN suppliers s ON s.id = p.supplier_id
   JOIN profiles prof ON prof.id = osr.requested_by
@@ -420,7 +380,7 @@ GRANT EXECUTE ON FUNCTION get_pending_oos_requests TO authenticated;
 -- Grant table access
 GRANT SELECT, INSERT, UPDATE ON out_of_stock_requests TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON purchase_orders TO authenticated;
-GRANT SELECT, INSERT, UPDATE ON purchase_order_items TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON po_items TO authenticated;
 GRANT SELECT, UPDATE ON line_settings TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON supplier_line_contacts TO authenticated;
 
@@ -430,8 +390,8 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON supplier_line_contacts TO authenticated;
 COMMENT ON TABLE out_of_stock_requests IS 
 'คำขอใช้วัสดุที่หมดจากสต็อก เมื่อทันตแพทย์ยืนยันจะใช้';
 
-COMMENT ON TABLE purchase_orders IS 
-'ใบสั่งซื้อ (PO) เชื่อมโยงกับ LINE Messaging API';
+COMMENT ON TABLE po_items IS 
+'รายการสินค้าในใบสั่งซื้อ';
 
 COMMENT ON TABLE line_settings IS 
 'การตั้งค่า LINE Messaging API และ Message Templates';

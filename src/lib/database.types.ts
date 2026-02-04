@@ -1,4 +1,4 @@
-// DentalFlow OS - Database Types
+// Dental Implant Management - Database Types
 // Generated from SQL migrations
 
 export type Json =

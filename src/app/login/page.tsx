@@ -43,7 +43,7 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-600 rounded-xl mb-4">
             <span className="text-2xl font-bold text-white">D</span>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">DentalFlow OS</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Dental Implant Management</h1>
           <p className="text-slate-500 mt-1">ระบบบริหารจัดการสต็อกรากฟันเทียม</p>
         </div>
 

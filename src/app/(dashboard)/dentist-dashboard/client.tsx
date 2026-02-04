@@ -60,7 +60,7 @@ interface ActionCase {
   action_type: string;
   action_description: string;
   priority: string;
-  traffic_light_status: string;
+  traffic_light: string;
 }
 
 interface CalendarCase {
@@ -503,7 +503,7 @@ export function DentistDashboardClient({ initialData }: { initialData: InitialDa
                 <div key={c.case_id} className="p-4 hover:bg-gray-50">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className={`w-3 h-3 rounded-full ${getTrafficLightColor(c.traffic_light_status)}`} />
+                      <div className={`w-3 h-3 rounded-full ${getTrafficLightColor(c.traffic_light)}`} />
                       <div>
                         <p className="font-medium">{c.patient_name}</p>
                         <p className="text-sm text-gray-600">{c.action_description}</p>

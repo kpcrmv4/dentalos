@@ -99,7 +99,7 @@ export default async function DentistDashboardPage() {
     action_type: string;
     action_description: string;
     priority: string;
-    traffic_light_status: string;
+    traffic_light: string;
   };
   type CalendarCase = {
     case_id: string;

@@ -1,4 +1,4 @@
-import { Calendar, Clock, AlertTriangle, Package } from 'lucide-react'
+import { Calendar, Clock, AlertTriangle, HelpCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 
 export async function StatsCards() {
@@ -13,8 +13,8 @@ export async function StatsCards() {
   const [
     monthCasesResult,
     pendingCasesResult,
-    redCasesResult,
-    lowStockResult,
+    notReadyCasesResult,
+    noReservationCasesResult,
   ] = await Promise.all([
     // Cases this month
     supabase
@@ -30,43 +30,25 @@ export async function StatsCards() {
       .eq('status', 'scheduled')
       .gte('scheduled_date', now.toISOString().split('T')[0]),
 
-    // Red light cases (missing materials)
+    // Not ready cases (red OR gray - missing materials or no reservation)
     supabase
       .from('cases')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'scheduled')
-      .eq('traffic_light', 'red'),
+      .in('traffic_light', ['red', 'gray']),
 
-    // Low stock items (quantity - reserved_quantity <= reorder_point)
+    // Cases with no reservation (gray status)
     supabase
-      .from('stock_items')
-      .select(`
-        id,
-        quantity,
-        reserved_quantity,
-        product:products!inner (
-          reorder_point
-        )
-      `)
-      .eq('status', 'active'),
+      .from('cases')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'scheduled')
+      .eq('traffic_light', 'gray'),
   ])
-
-  // Calculate low stock count
-  const stockItems = (lowStockResult.data || []) as unknown as {
-    id: string
-    quantity: number
-    reserved_quantity: number
-    product: { reorder_point: number }
-  }[]
-  const lowStockCount = stockItems.filter(item => {
-    const available = item.quantity - item.reserved_quantity
-    const reorderPoint = item.product?.reorder_point || 5
-    return available <= reorderPoint
-  }).length
 
   const monthCases = monthCasesResult.count || 0
   const pendingCases = pendingCasesResult.count || 0
-  const redCases = redCasesResult.count || 0
+  const notReadyCases = notReadyCasesResult.count || 0
+  const noReservationCases = noReservationCasesResult.count || 0
 
   const stats = [
     {
@@ -85,17 +67,17 @@ export async function StatsCards() {
     },
     {
       title: 'วัสดุยังไม่พร้อม',
-      value: redCases,
+      value: notReadyCases,
       subtitle: 'ต้องเตรียมของ',
       icon: AlertTriangle,
-      color: redCases > 0 ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600',
+      color: notReadyCases > 0 ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600',
     },
     {
-      title: 'รายการใกล้หมด',
-      value: lowStockCount,
-      subtitle: 'ต้องสั่งซื้อ',
-      icon: Package,
-      color: lowStockCount > 0 ? 'bg-amber-50 text-amber-600' : 'bg-green-50 text-green-600',
+      title: 'รายการที่ยังไม่จอง',
+      value: noReservationCases,
+      subtitle: 'รอหมอจองวัสดุ',
+      icon: HelpCircle,
+      color: noReservationCases > 0 ? 'bg-amber-50 text-amber-600' : 'bg-green-50 text-green-600',
     },
   ]
 

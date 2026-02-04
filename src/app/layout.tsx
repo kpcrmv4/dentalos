@@ -6,7 +6,7 @@ import { Providers } from '@/components/providers'
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
 export const metadata: Metadata = {
-  title: 'DentalFlow OS',
+  title: 'Dental Implant Management',
   description: 'ระบบบริหารจัดการสต็อกรากฟันเทียมและเวิร์กโฟลว์คลินิก',
 }
 

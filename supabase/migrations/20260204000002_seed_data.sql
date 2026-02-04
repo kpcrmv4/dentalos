@@ -1,6 +1,6 @@
 -- =====================================================
--- DentalFlow OS - Seed Data (FIXED VERSION)
--- Version: 2.0.0
+-- DentalFlow OS - Seed Data (FIXED VERSION v3)
+-- Version: 3.0.0
 -- Created: 2026-02-04
 -- =====================================================
 
@@ -12,7 +12,61 @@ DROP TRIGGER IF EXISTS audit_reservations ON reservations;
 DROP TRIGGER IF EXISTS audit_purchase_orders ON purchase_orders;
 
 -- =====================================================
--- 1. SAMPLE PRODUCTS (Simple INSERT)
+-- 0. ADD UNIQUE CONSTRAINTS IF NOT EXISTS
+-- =====================================================
+
+-- Add unique constraint on products.sku if not exists
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'products_sku_unique'
+  ) THEN
+    ALTER TABLE products ADD CONSTRAINT products_sku_unique UNIQUE (sku);
+  END IF;
+END $$;
+
+-- Add unique constraint on patients.hn_number if not exists
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'patients_hn_number_unique'
+  ) THEN
+    ALTER TABLE patients ADD CONSTRAINT patients_hn_number_unique UNIQUE (hn_number);
+  END IF;
+END $$;
+
+-- Add unique constraint on cases.case_number if not exists
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'cases_case_number_unique'
+  ) THEN
+    ALTER TABLE cases ADD CONSTRAINT cases_case_number_unique UNIQUE (case_number);
+  END IF;
+END $$;
+
+-- Add unique constraint on purchase_orders.po_number if not exists
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'purchase_orders_po_number_unique'
+  ) THEN
+    ALTER TABLE purchase_orders ADD CONSTRAINT purchase_orders_po_number_unique UNIQUE (po_number);
+  END IF;
+END $$;
+
+-- Add unique constraint on stock_items.lot_number if not exists
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'stock_items_lot_number_unique'
+  ) THEN
+    ALTER TABLE stock_items ADD CONSTRAINT stock_items_lot_number_unique UNIQUE (lot_number);
+  END IF;
+END $$;
+
+-- =====================================================
+-- 1. SAMPLE PRODUCTS
 -- =====================================================
 
 DO $$
@@ -40,7 +94,6 @@ BEGIN
 
   -- Only insert if categories and suppliers exist
   IF v_implant_cat IS NOT NULL AND v_str_supplier IS NOT NULL THEN
-    -- Insert products one by one to avoid issues
     INSERT INTO products (supplier_id, category_id, sku, name, brand, size, unit, reorder_point, standard_cost)
     VALUES (v_str_supplier, v_implant_cat, 'STR-BLT-410', 'Straumann BLT Implant 4.1x10mm', 'Straumann', '4.1x10mm', 'ชิ้น', 5, 25000.00)
     ON CONFLICT (sku) DO NOTHING;
@@ -121,15 +174,15 @@ BEGIN
     -- Add 3 LOT numbers for each product
     INSERT INTO stock_items (product_id, lot_number, expiry_date, quantity, reserved_quantity, cost_price, location, status)
     VALUES (v_product_id, 'LOT-' || SUBSTRING(v_product_sku, 1, 7) || '-001', '2027-06-15'::DATE, 10, 0, 20000.00, 'A-01-01', 'active')
-    ON CONFLICT DO NOTHING;
+    ON CONFLICT (lot_number) DO NOTHING;
     
     INSERT INTO stock_items (product_id, lot_number, expiry_date, quantity, reserved_quantity, cost_price, location, status)
     VALUES (v_product_id, 'LOT-' || SUBSTRING(v_product_sku, 1, 7) || '-002', '2027-03-20'::DATE, 5, 0, 20000.00, 'A-01-02', 'active')
-    ON CONFLICT DO NOTHING;
+    ON CONFLICT (lot_number) DO NOTHING;
     
     INSERT INTO stock_items (product_id, lot_number, expiry_date, quantity, reserved_quantity, cost_price, location, status)
     VALUES (v_product_id, 'LOT-' || SUBSTRING(v_product_sku, 1, 7) || '-003', '2026-04-10'::DATE, 3, 0, 20000.00, 'B-01-01', 'active')
-    ON CONFLICT DO NOTHING;
+    ON CONFLICT (lot_number) DO NOTHING;
   END LOOP;
 END $$;
 
@@ -138,13 +191,27 @@ END $$;
 -- =====================================================
 
 INSERT INTO patients (hn_number, full_name, phone, email, date_of_birth, notes)
-VALUES 
-  ('HN-001234', 'คุณสมศักดิ์ ใจดี', '081-234-5678', 'somsak@email.com', '1975-05-15'::DATE, 'ผู้ป่วยดูแลเป็นอย่างดี'),
-  ('HN-001235', 'คุณมาลี สุขใจ', '082-345-6789', 'malee@email.com', '1982-08-20'::DATE, NULL),
-  ('HN-001236', 'คุณประสิทธิ์ มั่นคง', '083-456-7890', 'prasit@email.com', '1968-12-01'::DATE, 'แพ้ยา Penicillin'),
-  ('HN-001237', 'คุณวิภา รักษ์สุข', '084-567-8901', 'wipa@email.com', '1990-03-10'::DATE, NULL),
-  ('HN-001238', 'คุณสมชาย ดีใจ', '085-678-9012', 'somchai@email.com', '1985-07-25'::DATE, NULL),
-  ('HN-001239', 'คุณนิภา แก้วใส', '086-789-0123', 'nipa@email.com', '1978-11-30'::DATE, 'เบาหวาน ความดัน')
+VALUES ('HN-001234', 'คุณสมศักดิ์ ใจดี', '081-234-5678', 'somsak@email.com', '1975-05-15'::DATE, 'ผู้ป่วยดูแลเป็นอย่างดี')
+ON CONFLICT (hn_number) DO NOTHING;
+
+INSERT INTO patients (hn_number, full_name, phone, email, date_of_birth, notes)
+VALUES ('HN-001235', 'คุณมาลี สุขใจ', '082-345-6789', 'malee@email.com', '1982-08-20'::DATE, NULL)
+ON CONFLICT (hn_number) DO NOTHING;
+
+INSERT INTO patients (hn_number, full_name, phone, email, date_of_birth, notes)
+VALUES ('HN-001236', 'คุณประสิทธิ์ มั่นคง', '083-456-7890', 'prasit@email.com', '1968-12-01'::DATE, 'แพ้ยา Penicillin')
+ON CONFLICT (hn_number) DO NOTHING;
+
+INSERT INTO patients (hn_number, full_name, phone, email, date_of_birth, notes)
+VALUES ('HN-001237', 'คุณวิภา รักษ์สุข', '084-567-8901', 'wipa@email.com', '1990-03-10'::DATE, NULL)
+ON CONFLICT (hn_number) DO NOTHING;
+
+INSERT INTO patients (hn_number, full_name, phone, email, date_of_birth, notes)
+VALUES ('HN-001238', 'คุณสมชาย ดีใจ', '085-678-9012', 'somchai@email.com', '1985-07-25'::DATE, NULL)
+ON CONFLICT (hn_number) DO NOTHING;
+
+INSERT INTO patients (hn_number, full_name, phone, email, date_of_birth, notes)
+VALUES ('HN-001239', 'คุณนิภา แก้วใส', '086-789-0123', 'nipa@email.com', '1978-11-30'::DATE, 'เบาหวาน ความดัน')
 ON CONFLICT (hn_number) DO NOTHING;
 
 -- =====================================================
@@ -252,21 +319,22 @@ BEGIN
   SELECT id INTO v_user_id FROM profiles ORDER BY created_at LIMIT 1;
 
   IF v_user_id IS NOT NULL THEN
+    -- Use simple insert without conflict handling for notifications
     INSERT INTO notifications (user_id, type, title, message, is_read)
-    VALUES (v_user_id, 'low_stock', 'สินค้าใกล้หมด', 'Nobel Active Implant 3.5x10mm เหลือ 2 ชิ้น', false)
-    ON CONFLICT DO NOTHING;
+    SELECT v_user_id, 'low_stock', 'สินค้าใกล้หมด', 'Nobel Active Implant 3.5x10mm เหลือ 2 ชิ้น', false
+    WHERE NOT EXISTS (SELECT 1 FROM notifications WHERE title = 'สินค้าใกล้หมด' AND user_id = v_user_id);
     
     INSERT INTO notifications (user_id, type, title, message, is_read)
-    VALUES (v_user_id, 'expiring', 'สินค้าใกล้หมดอายุ', 'Bio-Oss Bone Graft 0.5g หมดอายุใน 60 วัน', false)
-    ON CONFLICT DO NOTHING;
+    SELECT v_user_id, 'expiring', 'สินค้าใกล้หมดอายุ', 'Bio-Oss Bone Graft 0.5g หมดอายุใน 60 วัน', false
+    WHERE NOT EXISTS (SELECT 1 FROM notifications WHERE title = 'สินค้าใกล้หมดอายุ' AND user_id = v_user_id);
     
     INSERT INTO notifications (user_id, type, title, message, is_read)
-    VALUES (v_user_id, 'case', 'เคสวันนี้', 'มี 3 เคสที่นัดหมายวันนี้', true)
-    ON CONFLICT DO NOTHING;
+    SELECT v_user_id, 'case', 'เคสวันนี้', 'มี 3 เคสที่นัดหมายวันนี้', true
+    WHERE NOT EXISTS (SELECT 1 FROM notifications WHERE title = 'เคสวันนี้' AND user_id = v_user_id);
     
     INSERT INTO notifications (user_id, type, title, message, is_read)
-    VALUES (v_user_id, 'transfer', 'รอคืนของ', 'TR-2026-0001 เกินกำหนดคืน 2 วัน', true)
-    ON CONFLICT DO NOTHING;
+    SELECT v_user_id, 'transfer', 'รอคืนของ', 'TR-2026-0001 เกินกำหนดคืน 2 วัน', true
+    WHERE NOT EXISTS (SELECT 1 FROM notifications WHERE title = 'รอคืนของ' AND user_id = v_user_id);
   END IF;
 END $$;
 

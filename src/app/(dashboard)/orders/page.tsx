@@ -209,7 +209,7 @@ export default function OrdersPage() {
       message: `ใบสั่งซื้อ ${order.po_number} ถูกส่งไปยัง ${order.supplier.name}`,
       data: { po_id: order.id, po_number: order.po_number },
       target_roles: ['inventory', 'admin'],
-    })
+    } as never)
 
     fetchOrders()
   }
@@ -276,7 +276,7 @@ export default function OrdersPage() {
       message: `ใบสั่งซื้อ ${selectedOrder.po_number} ${allReceived ? 'รับสินค้าครบแล้ว' : 'รับสินค้าบางส่วน'}`,
       data: { po_id: selectedOrder.id, po_number: selectedOrder.po_number },
       target_roles: ['inventory', 'admin'],
-    })
+    } as never)
 
     setIsReceiveModalOpen(false)
     setSelectedOrder(null)

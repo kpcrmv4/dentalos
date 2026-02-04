@@ -85,7 +85,9 @@ export function NotificationBell() {
       .eq('id', user.id)
       .single()
     
-    const userRole = (profile?.role as any)?.name
+    type ProfileWithRole = { role: { name: string } | null }
+    const typedProfile = profile as ProfileWithRole | null
+    const userRole = typedProfile?.role?.name
 
     const { data, error } = await supabase
       .from('notifications')

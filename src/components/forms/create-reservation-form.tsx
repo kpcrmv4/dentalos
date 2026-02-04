@@ -104,13 +104,22 @@ export function CreateReservationForm({ isOpen, onClose, onSuccess }: CreateRese
 
       if (error) throw error
 
-      setCases((data || []).map(c => ({
+      type CaseRow = {
+        id: string;
+        case_number: string;
+        patient_name: string;
+        scheduled_date: string;
+        tooth_number: string;
+        dentist: { full_name: string } | null;
+      }
+      const typedData = (data || []) as CaseRow[]
+      setCases(typedData.map(c => ({
         id: c.id,
         case_number: c.case_number,
         patient_name: c.patient_name,
         scheduled_date: c.scheduled_date,
         tooth_number: c.tooth_number,
-        dentist_name: (c.dentist as any)?.full_name || null
+        dentist_name: c.dentist?.full_name || null
       })))
     } catch (err) {
       console.error('Error fetching cases:', err)
@@ -141,7 +150,8 @@ export function CreateReservationForm({ isOpen, onClose, onSuccess }: CreateRese
 
     try {
       // Try RPC function first
-      const { data, error } = await supabase.rpc('search_products_with_stock', {
+      const rpcClient = supabase as unknown as { rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }> }
+      const { data, error } = await rpcClient.rpc('search_products_with_stock', {
         p_search_term: term || null,
         p_category_id: null,
         p_supplier_id: null,
@@ -152,7 +162,7 @@ export function CreateReservationForm({ isOpen, onClose, onSuccess }: CreateRese
         // Fallback to basic search
         await fallbackSearch(term)
       } else {
-        setSearchResults(data || [])
+        setSearchResults((data || []) as Product[])
       }
     } catch (err) {
       await fallbackSearch(term)
@@ -179,7 +189,26 @@ export function CreateReservationForm({ isOpen, onClose, onSuccess }: CreateRese
     const { data } = await query
 
     if (data) {
-      const productIds = data.map(p => p.id)
+      type ProductRow = {
+        id: string;
+        name: string;
+        display_name: string | null;
+        brand: string | null;
+        ref_code: string | null;
+        category_id: string | null;
+        category: { name: string } | null;
+      }
+      type StockRow = {
+        id: string;
+        product_id: string;
+        quantity: number;
+        reserved_quantity: number;
+        expiry_date: string | null;
+        lot_number: string;
+        location: string | null;
+      }
+      const typedData = data as ProductRow[]
+      const productIds = typedData.map(p => p.id)
       const { data: stockData } = await supabase
         .from('stock_items')
         .select('*')
@@ -188,8 +217,9 @@ export function CreateReservationForm({ isOpen, onClose, onSuccess }: CreateRese
         .gt('quantity', 0)
         .order('expiry_date', { ascending: true, nullsFirst: false })
 
-      const products: Product[] = data.map(p => {
-        const stocks = (stockData || []).filter(s => s.product_id === p.id)
+      const typedStockData = (stockData || []) as StockRow[]
+      const products: Product[] = typedData.map(p => {
+        const stocks = typedStockData.filter(s => s.product_id === p.id)
         const totalAvailable = stocks.reduce((sum, s) => sum + (s.quantity - s.reserved_quantity), 0)
         const earliestExpiry = stocks.find(s => s.expiry_date)?.expiry_date || null
 
@@ -205,7 +235,7 @@ export function CreateReservationForm({ isOpen, onClose, onSuccess }: CreateRese
           brand: p.brand,
           ref_code: p.ref_code,
           category_id: p.category_id,
-          category_name: (p.category as any)?.name || null,
+          category_name: p.category?.name || null,
           total_available: totalAvailable,
           earliest_expiry: earliestExpiry,
           days_until_expiry: daysUntilExpiry,
@@ -234,7 +264,8 @@ export function CreateReservationForm({ isOpen, onClose, onSuccess }: CreateRese
     const supabase = createClient()
 
     try {
-      const { data, error } = await supabase.rpc('find_similar_products', {
+      const rpcClient = supabase as unknown as { rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }> }
+      const { data, error } = await rpcClient.rpc('find_similar_products', {
         p_product_id: product.id,
         p_limit: 5
       })
@@ -243,7 +274,7 @@ export function CreateReservationForm({ isOpen, onClose, onSuccess }: CreateRese
         // Fallback
         await fallbackSimilarSearch(product)
       } else {
-        setSimilarProducts(data || [])
+        setSimilarProducts((data || []) as SimilarProduct[])
       }
     } catch (err) {
       await fallbackSimilarSearch(product)
@@ -270,7 +301,26 @@ export function CreateReservationForm({ isOpen, onClose, onSuccess }: CreateRese
       .limit(5)
 
     if (data) {
-      const productIds = data.map(p => p.id)
+      type ProductRow = {
+        id: string;
+        name: string;
+        display_name: string | null;
+        brand: string | null;
+        ref_code: string | null;
+        category_id: string | null;
+        category: { name: string } | null;
+      }
+      type StockRow = {
+        id: string;
+        product_id: string;
+        quantity: number;
+        reserved_quantity: number;
+        expiry_date: string | null;
+        lot_number: string;
+        location: string | null;
+      }
+      const typedData = data as ProductRow[]
+      const productIds = typedData.map(p => p.id)
       const { data: stockData } = await supabase
         .from('stock_items')
         .select('*')
@@ -279,8 +329,9 @@ export function CreateReservationForm({ isOpen, onClose, onSuccess }: CreateRese
         .gt('quantity', 0)
         .order('expiry_date', { ascending: true, nullsFirst: false })
 
-      const similar: SimilarProduct[] = data.map(p => {
-        const stocks = (stockData || []).filter(s => s.product_id === p.id)
+      const typedStockData = (stockData || []) as StockRow[]
+      const similar: SimilarProduct[] = typedData.map(p => {
+        const stocks = typedStockData.filter(s => s.product_id === p.id)
         const totalAvailable = stocks.reduce((sum, s) => sum + (s.quantity - s.reserved_quantity), 0)
         const earliestExpiry = stocks.find(s => s.expiry_date)?.expiry_date || null
 
@@ -296,7 +347,7 @@ export function CreateReservationForm({ isOpen, onClose, onSuccess }: CreateRese
           brand: p.brand,
           ref_code: p.ref_code,
           category_id: p.category_id,
-          category_name: (p.category as any)?.name || null,
+          category_name: p.category?.name || null,
           total_available: totalAvailable,
           earliest_expiry: earliestExpiry,
           days_until_expiry: daysUntilExpiry,
@@ -412,10 +463,11 @@ export function CreateReservationForm({ isOpen, onClose, onSuccess }: CreateRese
 
     try {
       // Call reserve_stock function for each item
+      const rpcClient = supabase as unknown as { rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }> }
       for (const item of items) {
         if (!item.product_id || !item.stock_id) continue
 
-        const { error } = await supabase.rpc('reserve_stock', {
+        const { error } = await rpcClient.rpc('reserve_stock', {
           p_case_id: formData.case_id,
           p_stock_item_id: item.stock_id,
           p_quantity: item.quantity

@@ -5,22 +5,45 @@ interface LineMessage {
   type: 'text' | 'flex'
   text?: string
   altText?: string
-  contents?: any
+  contents?: unknown
+}
+
+interface LineSettings {
+  channel_access_token: string
+  message_templates: Record<string, string>
+}
+
+interface POItem {
+  product: { name: string; ref_code: string | null }
+  quantity_ordered: number
+}
+
+interface PurchaseOrder {
+  po_number: string
+  expected_delivery_date: string | null
+  items: POItem[]
+}
+
+interface SupplierContact {
+  id: string
+  line_user_id: string | null
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     
     // Get request body
     const body = await request.json()
     const { po_id, supplier_id, message_type = 'normal_order' } = body
 
     // Get LINE settings
-    const { data: settings, error: settingsError } = await supabase
+    const { data: settingsData, error: settingsError } = await supabase
       .from('line_settings')
       .select('*')
       .single()
+
+    const settings = settingsData as LineSettings | null
 
     if (settingsError || !settings || !settings.channel_access_token) {
       return NextResponse.json(
@@ -30,7 +53,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get PO details
-    const { data: po, error: poError } = await supabase
+    const { data: poData, error: poError } = await supabase
       .from('purchase_orders')
       .select(`
         *,
@@ -43,6 +66,8 @@ export async function POST(request: NextRequest) {
       .eq('id', po_id)
       .single()
 
+    const po = poData as PurchaseOrder | null
+
     if (poError || !po) {
       return NextResponse.json(
         { error: 'Purchase order not found' },
@@ -51,12 +76,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Get supplier LINE contacts
-    const { data: contacts, error: contactsError } = await supabase
+    const { data: contactsData, error: contactsError } = await supabase
       .from('supplier_line_contacts')
       .select('*')
       .eq('supplier_id', supplier_id)
       .eq('is_active', true)
       .order('contact_type', { ascending: true }) // primary first
+
+    const contacts = contactsData as SupplierContact[] | null
 
     if (contactsError || !contacts || contacts.length === 0) {
       return NextResponse.json(
@@ -70,7 +97,7 @@ export async function POST(request: NextRequest) {
     
     // Format items list
     const itemsList = po.items
-      .map((item: any, index: number) => 
+      .map((item: POItem, index: number) => 
         `${index + 1}. ${item.product.name} x${item.quantity_ordered} (${item.product.ref_code || '-'})`
       )
       .join('\n')
@@ -123,7 +150,7 @@ export async function POST(request: NextRequest) {
           line_message_sent: true,
           line_message_sent_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
-        })
+        } as never)
         .eq('id', po_id)
     }
 

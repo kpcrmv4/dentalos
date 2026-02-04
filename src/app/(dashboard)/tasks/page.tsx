@@ -230,7 +230,7 @@ export default function TasksPage() {
         product_name: item.product_name,
       },
       target_roles: ['inventory'],
-    })
+    } as never)
 
     fetchTasks()
   }
@@ -360,7 +360,7 @@ export default function TasksPage() {
         case_number: selectedTask.case_number,
       },
       target_roles: ['cs', 'dentist', 'admin'],
-    })
+    } as never)
 
     setIsDetailModalOpen(false)
     setSelectedTask(null)

@@ -562,7 +562,7 @@ export function InventoryClient({ initialData }: { initialData: InitialData }) {
               </button>
             </div>
             <div className="p-6">
-              <ReceiveStockForm onSuccess={handleReceiveSuccess} />
+              <ReceiveStockForm isOpen={isReceiveModalOpen} onClose={() => setIsReceiveModalOpen(false)} onSuccess={handleReceiveSuccess} />
             </div>
           </div>
         </div>

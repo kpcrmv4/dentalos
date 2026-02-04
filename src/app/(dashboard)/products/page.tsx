@@ -156,15 +156,18 @@ export default function ProductsPage() {
       
       // Fetch attributes for all products
       if (data && data.length > 0) {
-        const productIds = data.map(p => p.id)
+        type ProductRow = { id: string; [key: string]: unknown }
+        const typedData = data as ProductRow[]
+        const productIds = typedData.map(p => p.id)
         const { data: attrs } = await supabase
           .from('product_attributes')
           .select('*')
           .in('product_id', productIds)
         
         if (attrs) {
+          const typedAttrs = attrs as ProductAttribute[]
           const grouped: Record<string, ProductAttribute[]> = {}
-          attrs.forEach(attr => {
+          typedAttrs.forEach(attr => {
             if (!grouped[attr.product_id]) grouped[attr.product_id] = []
             grouped[attr.product_id].push(attr)
           })
@@ -188,9 +191,28 @@ export default function ProductsPage() {
     if (categoriesRes.data) setCategories(categoriesRes.data)
     if (templatesRes.data) {
       // Parse options JSON
-      const parsed = templatesRes.data.map(t => ({
-        ...t,
-        options: t.options ? (typeof t.options === 'string' ? JSON.parse(t.options) : t.options) : null
+      type TemplateRow = {
+        id: string;
+        category_id: string;
+        attribute_key: string;
+        attribute_label: string;
+        attribute_type: 'text' | 'number' | 'select' | 'multi_select';
+        is_required: boolean;
+        options: string | string[] | null;
+        unit: string | null;
+        sort_order: number;
+      }
+      const typedTemplates = templatesRes.data as TemplateRow[]
+      const parsed: CategoryAttributeTemplate[] = typedTemplates.map(t => ({
+        id: t.id,
+        category_id: t.category_id,
+        attribute_key: t.attribute_key,
+        attribute_label: t.attribute_label,
+        attribute_type: t.attribute_type,
+        is_required: t.is_required,
+        options: t.options ? (typeof t.options === 'string' ? JSON.parse(t.options) : t.options) : null,
+        unit: t.unit,
+        sort_order: t.sort_order
       }))
       setCategoryTemplates(parsed)
     }
@@ -429,7 +451,7 @@ export default function ProductsPage() {
     if (editingProduct) {
       const { error } = await supabase
         .from('products')
-        .update(productData)
+        .update(productData as never)
         .eq('id', editingProduct.id)
       
       if (error) {
@@ -444,7 +466,7 @@ export default function ProductsPage() {
     } else {
       const { data, error } = await supabase
         .from('products')
-        .insert(productData)
+        .insert(productData as never)
         .select('id')
         .single()
       
@@ -453,7 +475,7 @@ export default function ProductsPage() {
         alert('เกิดข้อผิดพลาดในการสร้างสินค้า')
         return
       }
-      productId = data.id
+      productId = (data as { id: string }).id
     }
     
     // Insert new attributes
@@ -468,7 +490,7 @@ export default function ProductsPage() {
     if (attributeRows.length > 0) {
       const { error: attrError } = await supabase
         .from('product_attributes')
-        .insert(attributeRows)
+        .insert(attributeRows as never[])
       
       if (attrError) {
         console.error('Error saving attributes:', attrError)
@@ -476,7 +498,8 @@ export default function ProductsPage() {
     }
     
     // Update search text (if function exists)
-    await supabase.rpc('update_product_search_text', { p_product_id: productId }).catch(() => {})
+    const rpcClient = supabase as unknown as { rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }> }
+    await rpcClient.rpc('update_product_search_text', { p_product_id: productId }).catch(() => {})
     
     handleCloseModal()
     fetchProducts()
@@ -490,7 +513,7 @@ export default function ProductsPage() {
     // Soft delete by setting is_active to false
     const { error } = await supabase
       .from('products')
-      .update({ is_active: false })
+      .update({ is_active: false } as never)
       .eq('id', product.id)
     
     if (error) {

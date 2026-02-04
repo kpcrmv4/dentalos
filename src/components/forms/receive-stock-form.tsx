@@ -168,7 +168,7 @@ export function ReceiveStockForm({ isOpen, onClose, onSuccess }: ReceiveStockFor
           invoice_number: formData.invoice_number || null,
           received_by: user?.id || null,
           status: 'active',
-        })
+        } as never)
         
         if (error) {
           console.error('Error inserting stock item:', error)
@@ -186,7 +186,7 @@ export function ReceiveStockForm({ isOpen, onClose, onSuccess }: ReceiveStockFor
           item_count: validItems.length,
           total_quantity: validItems.reduce((sum, item) => sum + item.quantity, 0)
         },
-      })
+      } as never)
 
       onSuccess()
       handleClose()

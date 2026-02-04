@@ -148,7 +148,9 @@ export default function ReportsPage() {
       .select('quantity, unit_cost')
       .eq('status', 'available')
     
-    const stockValue = stockData?.reduce((sum, item) => sum + (item.quantity * (item.unit_cost || 0)), 0) || 0
+    type StockItem = { quantity: number; unit_cost: number | null }
+    const typedStockData = stockData as StockItem[] | null
+    const stockValue = typedStockData?.reduce((sum, item) => sum + (item.quantity * (item.unit_cost || 0)), 0) || 0
     
     // Fetch items used
     const { data: usageData } = await supabase
@@ -157,7 +159,9 @@ export default function ReportsPage() {
       .eq('status', 'used')
       .gte('used_at', startOfMonth)
     
-    const itemsUsed = usageData?.reduce((sum, item) => sum + item.quantity, 0) || 0
+    type UsageItem = { quantity: number }
+    const typedUsageData = usageData as UsageItem[] | null
+    const itemsUsed = typedUsageData?.reduce((sum, item) => sum + item.quantity, 0) || 0
     
     // Fetch purchase value
     const { data: purchaseData } = await supabase
@@ -166,7 +170,9 @@ export default function ReportsPage() {
       .eq('status', 'received')
       .gte('received_at', startOfMonth)
     
-    const purchaseValue = purchaseData?.reduce((sum, item) => sum + item.total_amount, 0) || 0
+    type PurchaseItem = { total_amount: number }
+    const typedPurchaseData = purchaseData as PurchaseItem[] | null
+    const purchaseValue = typedPurchaseData?.reduce((sum, item) => sum + item.total_amount, 0) || 0
     
     setStats({
       totalCases: currentCases || 0,
@@ -185,9 +191,13 @@ export default function ReportsPage() {
   const fetchMasterData = async () => {
     const supabase = createClient()
     
+    // Get dentist role id first
+    const roleResult = await supabase.from('roles').select('id').eq('name', 'dentist').single()
+    const dentistRoleId = (roleResult.data as { id: string } | null)?.id
+    
     const [categoriesRes, dentistsRes] = await Promise.all([
       supabase.from('categories').select('id, name').order('sort_order'),
-      supabase.from('profiles').select('id, full_name').eq('role_id', (await supabase.from('roles').select('id').eq('name', 'dentist').single()).data?.id),
+      supabase.from('profiles').select('id, full_name').eq('role_id', dentistRoleId || ''),
     ])
     
     if (categoriesRes.data) setCategories(categoriesRes.data)

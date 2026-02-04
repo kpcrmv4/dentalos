@@ -331,31 +331,33 @@ export function DentistDashboardClient({ initialData }: { initialData: InitialDa
   const refreshData = useCallback(async () => {
     setIsRefreshing(true);
     try {
+      // Use type assertion to bypass strict type checking for RPC calls
+      const rpcClient = supabase as unknown as { rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }> };
       const [
         statsResult,
         calendarResult,
         summaryResult
       ] = await Promise.all([
-        supabase.rpc('get_dentist_stats', { 
+        rpcClient.rpc('get_dentist_stats', { 
           p_dentist_id: initialData.user.id,
           p_start_date: startDate,
           p_end_date: endDate
         }),
-        supabase.rpc('get_dentist_cases_calendar', { 
+        rpcClient.rpc('get_dentist_cases_calendar', { 
           p_dentist_id: initialData.user.id,
           p_start_date: startDate,
           p_end_date: endDate
         }),
-        supabase.rpc('get_calendar_summary', { 
+        rpcClient.rpc('get_calendar_summary', { 
           p_dentist_id: initialData.user.id,
           p_start_date: startDate,
           p_end_date: endDate
         })
       ]);
 
-      if (statsResult.data) setStats(statsResult.data);
-      if (calendarResult.data) setCalendarCases(calendarResult.data);
-      if (summaryResult.data) setCalendarSummary(summaryResult.data);
+      if (statsResult.data) setStats(statsResult.data as DentistStats);
+      if (calendarResult.data) setCalendarCases(calendarResult.data as CalendarCase[]);
+      if (summaryResult.data) setCalendarSummary(summaryResult.data as CalendarSummary);
     } catch (error) {
       console.error('Error refreshing data:', error);
     } finally {

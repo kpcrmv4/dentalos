@@ -90,7 +90,7 @@ export function LineSettingsPanel() {
         auto_send_urgent: settings.auto_send_urgent,
         auto_send_normal: settings.auto_send_normal,
         updated_at: new Date().toISOString()
-      })
+      } as never)
       .eq('id', settings.id)
 
     setSaving(false)
@@ -136,7 +136,7 @@ export function LineSettingsPanel() {
   const handleToggleContact = async (id: string, isActive: boolean) => {
     const { error } = await supabase
       .from('supplier_line_contacts')
-      .update({ is_active: !isActive })
+      .update({ is_active: !isActive } as never)
       .eq('id', id)
 
     if (!error) {

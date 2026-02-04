@@ -282,7 +282,8 @@ export const ProductSearch = memo(function ProductSearch({
     const supabase = createClient();
 
     try {
-      const { data, error } = await supabase.rpc('search_products_with_stock', {
+      const rpcClient = supabase as unknown as { rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }> };
+      const { data, error } = await rpcClient.rpc('search_products_with_stock', {
         p_search_term: term || null,
         p_category_id: categoryId || null,
         p_supplier_id: supplierId || null,
@@ -293,7 +294,7 @@ export const ProductSearch = memo(function ProductSearch({
         console.error('Search error:', error);
         await fallbackSearch(term, supabase);
       } else {
-        setProducts(data || []);
+        setProducts((data || []) as ProductWithStock[]);
       }
     } catch (err) {
       console.error('Search error:', err);
@@ -324,7 +325,27 @@ export const ProductSearch = memo(function ProductSearch({
     const { data } = await query;
 
     if (data) {
-      const productIds = data.map(p => p.id);
+      type ProductRow = {
+        id: string;
+        name: string;
+        display_name: string | null;
+        brand: string | null;
+        ref_code: string | null;
+        category_id: string | null;
+        category: { name: string } | null;
+        supplier: { name: string } | null;
+      };
+      type StockRow = {
+        id: string;
+        product_id: string;
+        quantity: number;
+        reserved_quantity: number;
+        expiry_date: string | null;
+        lot_number: string;
+        location: string | null;
+      };
+      const typedData = data as ProductRow[];
+      const productIds = typedData.map(p => p.id);
       const { data: stockData } = await supabase
         .from('stock_items')
         .select('*')
@@ -333,9 +354,10 @@ export const ProductSearch = memo(function ProductSearch({
         .gt('quantity', 0)
         .order('expiry_date', { ascending: true, nullsFirst: false });
 
+      const typedStockData = (stockData || []) as StockRow[];
       // Process in single pass
-      const productsWithStock: ProductWithStock[] = data.map(p => {
-        const stocks = (stockData || []).filter(s => s.product_id === p.id);
+      const productsWithStock: ProductWithStock[] = typedData.map(p => {
+        const stocks = typedStockData.filter(s => s.product_id === p.id);
         const { totalAvailable, earliestExpiry } = stocks.reduce(
           (acc, s) => ({
             totalAvailable: acc.totalAvailable + (s.quantity - s.reserved_quantity),
@@ -358,8 +380,8 @@ export const ProductSearch = memo(function ProductSearch({
           brand: p.brand,
           ref_code: p.ref_code,
           category_id: p.category_id,
-          category_name: (p.category as any)?.name || null,
-          supplier_name: (p.supplier as any)?.name || null,
+          category_name: p.category?.name || null,
+          supplier_name: p.supplier?.name || null,
           attributes: {},
           stock_items: stocks.map(s => ({ ...s, available: s.quantity - s.reserved_quantity })),
           total_available: totalAvailable,
@@ -389,7 +411,8 @@ export const ProductSearch = memo(function ProductSearch({
     const supabase = createClient();
 
     try {
-      const { data, error } = await supabase.rpc('find_similar_products', {
+      const rpcClient = supabase as unknown as { rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }> };
+      const { data, error } = await rpcClient.rpc('find_similar_products', {
         p_product_id: product.id,
         p_limit: 5
       });
@@ -405,8 +428,9 @@ export const ProductSearch = memo(function ProductSearch({
             .neq('id', product.id)
             .limit(5);
 
+          type FallbackProduct = { id: string; name: string; display_name: string | null; brand: string | null; ref_code: string | null; category_id: string | null };
           if (fallbackData) {
-            setSimilarProducts(fallbackData.map(p => ({
+            setSimilarProducts((fallbackData as FallbackProduct[]).map(p => ({
               ...p,
               category_name: null,
               supplier_name: null,
@@ -421,7 +445,7 @@ export const ProductSearch = memo(function ProductSearch({
           }
         }
       } else {
-        setSimilarProducts(data || []);
+        setSimilarProducts((data || []) as SimilarProduct[]);
       }
     } catch (err) {
       console.error('Similar search error:', err);

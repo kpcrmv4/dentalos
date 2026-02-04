@@ -95,8 +95,9 @@ export default function NotificationsPage() {
         .eq('id', user.id)
         .single()
       
-      if (profile?.role) {
-        setCurrentUserRole((profile.role as any).name)
+      const typedProfile = profile as { role: { name: string } | null } | null
+      if (typedProfile?.role) {
+        setCurrentUserRole(typedProfile.role.name)
       }
     }
   }
@@ -118,7 +119,8 @@ export default function NotificationsPage() {
       .eq('id', user.id)
       .single()
     
-    const userRole = (profile?.role as any)?.name
+    const typedProfile2 = profile as { role: { name: string } | null } | null
+    const userRole = typedProfile2?.role?.name
 
     // Fetch notifications for this user's role or specifically targeted to them
     let query = supabase
@@ -310,7 +312,7 @@ export default function NotificationsPage() {
     return true
   })
 
-  const notificationTypes = [...new Set(notifications.map(n => n.type))]
+  const notificationTypes = Array.from(new Set(notifications.map(n => n.type)))
 
   return (
     <div className="space-y-6">

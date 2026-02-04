@@ -87,16 +87,18 @@ export function ReceiveFromPOForm({ isOpen, onClose, onSuccess }: ReceiveFromPOF
     
     try {
       const supabase = createClient()
-      const { data, error } = await supabase.rpc('get_po_items_for_receive', {
+      const rpcClient = supabase as unknown as { rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }> }
+      const { data, error } = await rpcClient.rpc('get_po_items_for_receive', {
         p_po_id: po.id
       })
       
       if (error) throw error
       
-      setPOItems(data || [])
+      const typedData = (data || []) as POItem[]
+      setPOItems(typedData)
       
       // Initialize receive items
-      const items: ReceiveItem[] = (data || []).map((item: POItem) => ({
+      const items: ReceiveItem[] = typedData.map((item: POItem) => ({
         po_item_id: item.po_item_id,
         product_name: item.product_name,
         quantity_pending: item.quantity_pending,
@@ -167,7 +169,8 @@ export function ReceiveFromPOForm({ isOpen, onClose, onSuccess }: ReceiveFromPOF
       }))
       
       // Call receive_from_purchase_order function
-      const { data, error } = await supabase.rpc('receive_from_purchase_order', {
+      const rpcClient = supabase as unknown as { rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: { success: boolean; items_received: number; allocation_results: { allocated_count: number }[]; error?: string } | null; error: unknown }> }
+      const { data, error } = await rpcClient.rpc('receive_from_purchase_order', {
         p_po_id: selectedPO.id,
         p_received_by: user.id,
         p_invoice_number: invoiceNumber || null,
@@ -269,7 +272,7 @@ export function ReceiveFromPOForm({ isOpen, onClose, onSuccess }: ReceiveFromPOF
         </div>
       ) : (
         <div className="space-y-4">
-          <FormField label="เลขที่ใบส่งของ (Invoice)" optional>
+          <FormField label="เลขที่ใบส่งของ (Invoice)">
             <Input
               value={invoiceNumber}
               onChange={(e) => setInvoiceNumber(e.target.value)}

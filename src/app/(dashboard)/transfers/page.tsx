@@ -1,4 +1,8 @@
+'use client'
+
+import { useState } from 'react'
 import { ArrowLeftRight, Plus, Search, ArrowRight, ArrowLeft, RotateCcw } from 'lucide-react'
+import { CreateTransferForm } from '@/components/forms/create-transfer-form'
 
 // Mock data for transfers
 const mockTransfers = [
@@ -54,6 +58,25 @@ const statusConfig = {
 }
 
 export default function TransfersPage() {
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+
+  const handleCreateSuccess = () => {
+    alert('สร้างรายการสำเร็จ!')
+  }
+
+  const filteredTransfers = mockTransfers.filter((transfer) => {
+    const matchesSearch =
+      transfer.transfer_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      transfer.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      transfer.product_name.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesType = !typeFilter || transfer.type === typeFilter
+    const matchesStatus = !statusFilter || transfer.status === statusFilter
+    return matchesSearch && matchesType && matchesStatus
+  })
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -62,7 +85,10 @@ export default function TransfersPage() {
           <h1 className="text-2xl font-bold text-slate-900">ยืม-คืน/แลกเปลี่ยนกับบริษัท</h1>
           <p className="text-slate-500 mt-1">จัดการการยืม คืน และแลกเปลี่ยนสินค้ากับ Supplier</p>
         </div>
-        <button className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+        <button
+          onClick={() => setIsCreateModalOpen(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+        >
           <Plus className="w-5 h-5" />
           สร้างรายการใหม่
         </button>
@@ -124,16 +150,26 @@ export default function TransfersPage() {
             <input
               type="text"
               placeholder="ค้นหาด้วยเลขรายการ, บริษัท, หรือสินค้า..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
           </div>
-          <select className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
             <option value="">ประเภททั้งหมด</option>
             <option value="borrow">ยืม</option>
             <option value="return">คืน</option>
             <option value="exchange">แลกเปลี่ยน</option>
           </select>
-          <select className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
             <option value="">สถานะทั้งหมด</option>
             <option value="pending">รอดำเนินการ</option>
             <option value="pending_return">รอคืน</option>
@@ -158,17 +194,19 @@ export default function TransfersPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
-            {mockTransfers.map((transfer) => {
+            {filteredTransfers.map((transfer) => {
               const type = typeConfig[transfer.type as keyof typeof typeConfig]
               const status = statusConfig[transfer.status as keyof typeof statusConfig]
               const TypeIcon = type.icon
               return (
-                <tr key={transfer.id} className="hover:bg-slate-50">
+                <tr key={transfer.id} className="hover:bg-slate-50 cursor-pointer">
                   <td className="px-4 py-3">
                     <span className="font-mono font-medium text-indigo-600">{transfer.transfer_number}</span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${type.className}`}>
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${type.className}`}
+                    >
                       <TypeIcon className="w-3 h-3" />
                       {type.label}
                     </span>
@@ -206,6 +244,13 @@ export default function TransfersPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Create Transfer Modal */}
+      <CreateTransferForm
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={handleCreateSuccess}
+      />
     </div>
   )
 }

@@ -1,4 +1,8 @@
-import { ShoppingCart, Plus, Search, Filter, Eye, FileText, Truck } from 'lucide-react'
+'use client'
+
+import { useState } from 'react'
+import { ShoppingCart, Plus, Search, Eye, FileText, Truck } from 'lucide-react'
+import { CreateOrderForm } from '@/components/forms/create-order-form'
 
 // Mock data for purchase orders
 const mockOrders = [
@@ -54,6 +58,24 @@ const statusConfig = {
 }
 
 export default function OrdersPage() {
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [supplierFilter, setSupplierFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+
+  const handleCreateSuccess = () => {
+    alert('สร้างใบสั่งซื้อสำเร็จ!')
+  }
+
+  const filteredOrders = mockOrders.filter((order) => {
+    const matchesSearch =
+      order.po_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      order.supplier_name.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesSupplier = !supplierFilter || order.supplier_name.toLowerCase() === supplierFilter
+    const matchesStatus = !statusFilter || order.status === statusFilter
+    return matchesSearch && matchesSupplier && matchesStatus
+  })
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -62,7 +84,10 @@ export default function OrdersPage() {
           <h1 className="text-2xl font-bold text-slate-900">ใบสั่งซื้อ</h1>
           <p className="text-slate-500 mt-1">จัดการใบสั่งซื้อและติดตามการจัดส่ง</p>
         </div>
-        <button className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+        <button
+          onClick={() => setIsCreateModalOpen(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+        >
           <Plus className="w-5 h-5" />
           สร้างใบสั่งซื้อ
         </button>
@@ -124,17 +149,27 @@ export default function OrdersPage() {
             <input
               type="text"
               placeholder="ค้นหาด้วยเลข PO หรือชื่อ Supplier..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
           </div>
-          <select className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <select
+            value={supplierFilter}
+            onChange={(e) => setSupplierFilter(e.target.value)}
+            className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
             <option value="">Supplier ทั้งหมด</option>
             <option value="straumann">Straumann</option>
-            <option value="nobel">Nobel Biocare</option>
+            <option value="nobel biocare">Nobel Biocare</option>
             <option value="osstem">Osstem</option>
             <option value="geistlich">Geistlich</option>
           </select>
-          <select className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
             <option value="">สถานะทั้งหมด</option>
             <option value="draft">ร่าง</option>
             <option value="sent">ส่งแล้ว</option>
@@ -160,7 +195,7 @@ export default function OrdersPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
-            {mockOrders.map((order) => {
+            {filteredOrders.map((order) => {
               const status = statusConfig[order.status as keyof typeof statusConfig]
               return (
                 <tr key={order.id} className="hover:bg-slate-50">
@@ -174,9 +209,7 @@ export default function OrdersPage() {
                     <span className="text-slate-600">{order.items_count} รายการ</span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <span className="font-medium text-slate-900">
-                      {order.total_amount.toLocaleString('th-TH')} ฿
-                    </span>
+                    <span className="font-medium text-slate-900">{order.total_amount.toLocaleString('th-TH')} ฿</span>
                   </td>
                   <td className="px-4 py-3">
                     {order.ordered_at ? (
@@ -208,7 +241,10 @@ export default function OrdersPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <button className="p-1 hover:bg-slate-100 rounded">
+                    <button
+                      onClick={() => alert('ดูรายละเอียด PO: ' + order.po_number)}
+                      className="p-1 hover:bg-slate-100 rounded"
+                    >
                       <Eye className="w-5 h-5 text-slate-400" />
                     </button>
                   </td>
@@ -218,6 +254,13 @@ export default function OrdersPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Create Order Modal */}
+      <CreateOrderForm
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={handleCreateSuccess}
+      />
     </div>
   )
 }

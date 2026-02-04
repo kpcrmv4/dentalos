@@ -1,4 +1,8 @@
-import { Calendar, Plus, Filter, ChevronLeft, ChevronRight } from 'lucide-react'
+'use client'
+
+import { useState } from 'react'
+import { Plus, Filter, ChevronLeft, ChevronRight } from 'lucide-react'
+import { CreateCaseForm } from '@/components/forms/create-case-form'
 
 // Mock data for cases
 const mockCases = [
@@ -44,8 +48,13 @@ const trafficLightColors = {
 }
 
 export default function CalendarPage() {
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const today = new Date()
   const currentMonth = today.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' })
+
+  const handleCreateSuccess = () => {
+    alert('สร้างเคสสำเร็จ!')
+  }
 
   return (
     <div className="space-y-6">
@@ -55,7 +64,10 @@ export default function CalendarPage() {
           <h1 className="text-2xl font-bold text-slate-900">ปฏิทินเคสผ่าตัด</h1>
           <p className="text-slate-500 mt-1">จัดการนัดหมายและติดตามสถานะการเตรียมของ</p>
         </div>
-        <button className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+        <button
+          onClick={() => setIsCreateModalOpen(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+        >
           <Plus className="w-5 h-5" />
           สร้างเคสใหม่
         </button>
@@ -107,7 +119,7 @@ export default function CalendarPage() {
           {mockCases.map((caseItem) => {
             const light = trafficLightColors[caseItem.traffic_light as keyof typeof trafficLightColors]
             return (
-              <div key={caseItem.id} className="p-4 hover:bg-slate-50 transition-colors">
+              <div key={caseItem.id} className="p-4 hover:bg-slate-50 transition-colors cursor-pointer">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div className={`w-3 h-3 rounded-full ${light.dot}`} />
@@ -133,6 +145,13 @@ export default function CalendarPage() {
           })}
         </div>
       </div>
+
+      {/* Create Case Modal */}
+      <CreateCaseForm
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={handleCreateSuccess}
+      />
     </div>
   )
 }

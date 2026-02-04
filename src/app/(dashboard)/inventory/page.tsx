@@ -1,4 +1,8 @@
-import { Package, Plus, Search, Filter, AlertTriangle, Download } from 'lucide-react'
+'use client'
+
+import { useState } from 'react'
+import { Package, Plus, Search, AlertTriangle, Download } from 'lucide-react'
+import { ReceiveStockForm } from '@/components/forms/receive-stock-form'
 
 // Mock data for inventory
 const mockInventory = [
@@ -76,6 +80,24 @@ const statusConfig = {
 }
 
 export default function InventoryPage() {
+  const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+
+  const handleReceiveSuccess = () => {
+    alert('รับสินค้าเข้าคลังสำเร็จ!')
+  }
+
+  const filteredInventory = mockInventory.filter((item) => {
+    const matchesSearch =
+      item.product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.product.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.lot_number.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesStatus = !statusFilter || item.status === statusFilter
+    return matchesSearch && matchesStatus
+  })
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -85,11 +107,17 @@ export default function InventoryPage() {
           <p className="text-slate-500 mt-1">จัดการสินค้าคงคลังและติดตาม LOT</p>
         </div>
         <div className="flex items-center gap-2">
-          <button className="inline-flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50">
+          <button
+            onClick={() => alert('Export ข้อมูลสต็อก...')}
+            className="inline-flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50"
+          >
             <Download className="w-5 h-5" />
             Export
           </button>
-          <button className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+          <button
+            onClick={() => setIsReceiveModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+          >
             <Plus className="w-5 h-5" />
             รับสินค้าเข้า
           </button>
@@ -152,17 +180,27 @@ export default function InventoryPage() {
             <input
               type="text"
               placeholder="ค้นหาด้วยชื่อสินค้า, SKU, หรือ LOT..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
           </div>
-          <select className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
             <option value="">หมวดหมู่ทั้งหมด</option>
             <option value="implant">Implant</option>
             <option value="abutment">Abutment</option>
             <option value="bone-graft">Bone Graft</option>
             <option value="membrane">Membrane</option>
           </select>
-          <select className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
             <option value="">สถานะทั้งหมด</option>
             <option value="normal">ปกติ</option>
             <option value="low">ใกล้หมด</option>
@@ -186,11 +224,11 @@ export default function InventoryPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
-            {mockInventory.map((item) => {
+            {filteredInventory.map((item) => {
               const available = item.quantity - item.reserved_quantity
               const status = statusConfig[item.status as keyof typeof statusConfig]
               return (
-                <tr key={item.id} className="hover:bg-slate-50">
+                <tr key={item.id} className="hover:bg-slate-50 cursor-pointer">
                   <td className="px-4 py-3">
                     <div>
                       <p className="font-medium text-slate-900">{item.product.name}</p>
@@ -214,7 +252,9 @@ export default function InventoryPage() {
                     <span className="text-amber-600">{item.reserved_quantity}</span>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <span className={`font-semibold ${available <= item.reorder_point ? 'text-red-600' : 'text-emerald-600'}`}>
+                    <span
+                      className={`font-semibold ${available <= item.reorder_point ? 'text-red-600' : 'text-emerald-600'}`}
+                    >
                       {available}
                     </span>
                   </td>
@@ -232,6 +272,13 @@ export default function InventoryPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Receive Stock Modal */}
+      <ReceiveStockForm
+        isOpen={isReceiveModalOpen}
+        onClose={() => setIsReceiveModalOpen(false)}
+        onSuccess={handleReceiveSuccess}
+      />
     </div>
   )
 }

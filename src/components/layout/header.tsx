@@ -2,8 +2,9 @@
 
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Bell, LogOut, Menu } from 'lucide-react'
+import { LogOut, Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { NotificationDropdown } from '@/components/ui/notification-dropdown'
 
 interface HeaderProps {
   profile: {
@@ -37,14 +38,8 @@ export function Header({ profile }: HeaderProps) {
 
       {/* Right side */}
       <div className="flex items-center gap-4">
-        {/* Notifications */}
-        <button className="relative p-2 rounded-lg hover:bg-slate-100">
-          <Bell className="h-5 w-5 text-slate-600" />
-          <span className="absolute top-1 right-1 flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
-          </span>
-        </button>
+        {/* Notifications Dropdown */}
+        <NotificationDropdown />
 
         {/* User dropdown */}
         <div className="flex items-center gap-3">

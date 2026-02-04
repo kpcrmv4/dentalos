@@ -281,10 +281,66 @@ export interface Database {
       use_reserved_stock: {
         Args: {
           p_reservation_id: string
-          p_photo_url: string
-          p_user_id: string
+          p_photo_url: string | null
+          p_user_id: string | null
         }
         Returns: string
+      }
+      partial_use_reservation: {
+        Args: {
+          p_reservation_id: string
+          p_quantity_used: number
+          p_photo_url: string | null
+          p_reason: string | null
+          p_user_id: string | null
+        }
+        Returns: string
+      }
+      cancel_reservation: {
+        Args: {
+          p_reservation_id: string
+          p_reason: string | null
+          p_user_id: string | null
+        }
+        Returns: boolean
+      }
+      swap_reservation: {
+        Args: {
+          p_reservation_id: string
+          p_new_stock_item_id: string
+          p_reason: string | null
+          p_user_id: string | null
+        }
+        Returns: string
+      }
+      steal_reservation: {
+        Args: {
+          p_from_reservation_id: string
+          p_to_case_id: string
+          p_reason: string | null
+          p_user_id: string | null
+        }
+        Returns: string
+      }
+      use_unreserved_stock: {
+        Args: {
+          p_case_id: string
+          p_stock_item_id: string
+          p_quantity: number
+          p_photo_url: string | null
+          p_user_id: string | null
+        }
+        Returns: string
+      }
+      update_case_traffic_light: {
+        Args: {
+          p_case_id: string
+        }
+        Returns: string
+      }
+      run_daily_maintenance: {
+        Args: Record<string, never>
+        Returns: Json
       }
     }
     Enums: {

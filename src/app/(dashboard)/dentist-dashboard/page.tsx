@@ -120,6 +120,10 @@ export default async function DentistDashboardPage() {
     .order('scheduled_date', { ascending: true })
     .order('scheduled_time', { ascending: true, nullsFirst: false });
 
+  // Debug: Log query results
+  console.log('Dentist Dashboard - Query params:', { startDate, endDate });
+  console.log('Dentist Dashboard - Cases found:', casesData?.length || 0);
+  
   if (casesError) {
     console.error('Error fetching cases:', casesError);
   }

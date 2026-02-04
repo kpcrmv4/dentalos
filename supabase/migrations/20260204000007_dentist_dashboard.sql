@@ -29,17 +29,17 @@ BEGIN
     'pending_reservation', COUNT(*) FILTER (WHERE NOT EXISTS (
       SELECT 1 FROM reservations r WHERE r.case_id = c.id
     )),
-    'ready_cases', COUNT(*) FILTER (WHERE c.traffic_light_status = 'green'),
-    'partial_ready_cases', COUNT(*) FILTER (WHERE c.traffic_light_status = 'yellow'),
-    'not_ready_cases', COUNT(*) FILTER (WHERE c.traffic_light_status = 'red'),
+    'ready_cases', COUNT(*) FILTER (WHERE c.traffic_light = 'green'),
+    'partial_ready_cases', COUNT(*) FILTER (WHERE c.traffic_light = 'yellow'),
+    'not_ready_cases', COUNT(*) FILTER (WHERE c.traffic_light = 'red'),
     'completed_cases', COUNT(*) FILTER (WHERE c.status = 'completed'),
-    'today_cases', COUNT(*) FILTER (WHERE c.surgery_date = CURRENT_DATE),
-    'tomorrow_cases', COUNT(*) FILTER (WHERE c.surgery_date = CURRENT_DATE + INTERVAL '1 day'),
-    'this_week_cases', COUNT(*) FILTER (WHERE c.surgery_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days')
+    'today_cases', COUNT(*) FILTER (WHERE c.scheduled_date = CURRENT_DATE),
+    'tomorrow_cases', COUNT(*) FILTER (WHERE c.scheduled_date = CURRENT_DATE + INTERVAL '1 day'),
+    'this_week_cases', COUNT(*) FILTER (WHERE c.scheduled_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days')
   ) INTO v_result
   FROM cases c
   WHERE c.dentist_id = p_dentist_id
-    AND c.surgery_date BETWEEN v_start_date AND v_end_date
+    AND c.scheduled_date BETWEEN v_start_date AND v_end_date
     AND c.status != 'cancelled';
   
   RETURN v_result;
@@ -59,8 +59,8 @@ CREATE OR REPLACE FUNCTION get_new_assigned_cases(
   patient_hn VARCHAR,
   surgery_date DATE,
   surgery_time TIME,
-  treatment_type VARCHAR,
-  tooth_number VARCHAR,
+  procedure_type VARCHAR,
+  case_notes TEXT,
   assigned_at TIMESTAMPTZ,
   days_until_surgery INTEGER,
   has_reservation BOOLEAN
@@ -71,22 +71,22 @@ BEGIN
   RETURN QUERY
   SELECT 
     c.id AS case_id,
-    p.name AS patient_name,
-    p.hn AS patient_hn,
-    c.surgery_date,
-    c.surgery_time,
-    c.treatment_type,
-    c.tooth_number,
+    p.full_name AS patient_name,
+    p.hn_number AS patient_hn,
+    c.scheduled_date,
+    c.scheduled_time,
+    c.procedure_type,
+    c.notes,
     c.created_at AS assigned_at,
-    (c.surgery_date - CURRENT_DATE)::INTEGER AS days_until_surgery,
+    (c.scheduled_date - CURRENT_DATE)::INTEGER AS days_until_surgery,
     EXISTS (SELECT 1 FROM reservations r WHERE r.case_id = c.id) AS has_reservation
   FROM cases c
   JOIN patients p ON c.patient_id = p.id
   WHERE c.dentist_id = p_dentist_id
     AND c.status = 'scheduled'
-    AND c.surgery_date >= CURRENT_DATE
+    AND c.scheduled_date >= CURRENT_DATE
     AND NOT EXISTS (SELECT 1 FROM reservations r WHERE r.case_id = c.id)
-  ORDER BY c.surgery_date ASC, c.surgery_time ASC
+  ORDER BY c.scheduled_date ASC, c.scheduled_time ASC
   LIMIT p_limit;
 END;
 $$;
@@ -105,7 +105,7 @@ CREATE OR REPLACE FUNCTION get_action_required_cases(
   action_type VARCHAR,
   action_description TEXT,
   priority VARCHAR,
-  traffic_light_status VARCHAR
+  traffic_light VARCHAR
 )
 LANGUAGE plpgsql
 AS $$
@@ -114,37 +114,37 @@ BEGIN
   -- เคสที่วัสดุไม่พร้อม (red/yellow)
   SELECT 
     c.id AS case_id,
-    p.name AS patient_name,
-    c.surgery_date,
+    p.full_name AS patient_name,
+    c.scheduled_date,
     'material_not_ready'::VARCHAR AS action_type,
     CASE 
-      WHEN c.traffic_light_status = 'red' THEN 'วัสดุไม่พร้อม - ต้องจองหรือรอของเข้า'
+      WHEN c.traffic_light = 'red' THEN 'วัสดุไม่พร้อม - ต้องจองหรือรอของเข้า'
       ELSE 'วัสดุบางส่วนยังไม่พร้อม'
     END AS action_description,
     CASE 
-      WHEN c.surgery_date <= CURRENT_DATE + INTERVAL '2 days' THEN 'high'
-      WHEN c.surgery_date <= CURRENT_DATE + INTERVAL '7 days' THEN 'medium'
+      WHEN c.scheduled_date <= CURRENT_DATE + INTERVAL '2 days' THEN 'high'
+      WHEN c.scheduled_date <= CURRENT_DATE + INTERVAL '7 days' THEN 'medium'
       ELSE 'low'
     END AS priority,
-    c.traffic_light_status
+    c.traffic_light
   FROM cases c
   JOIN patients p ON c.patient_id = p.id
   WHERE c.dentist_id = p_dentist_id
     AND c.status = 'scheduled'
-    AND c.surgery_date >= CURRENT_DATE
-    AND c.traffic_light_status IN ('red', 'yellow')
+    AND c.scheduled_date >= CURRENT_DATE
+    AND c.traffic_light IN ('red', 'yellow')
   
   UNION ALL
   
   -- เคสที่มี OOS Request รอดำเนินการ
   SELECT 
     c.id AS case_id,
-    p.name AS patient_name,
-    c.surgery_date,
+    p.full_name AS patient_name,
+    c.scheduled_date,
     'oos_pending'::VARCHAR AS action_type,
     'มีคำขอวัสดุที่หมดสต็อก รอฝ่ายคลังดำเนินการ'::TEXT AS action_description,
     'medium'::VARCHAR AS priority,
-    c.traffic_light_status
+    c.traffic_light
   FROM cases c
   JOIN patients p ON c.patient_id = p.id
   JOIN out_of_stock_requests oos ON oos.case_id = c.id
@@ -177,10 +177,10 @@ CREATE OR REPLACE FUNCTION get_dentist_cases_calendar(
   patient_hn VARCHAR,
   surgery_date DATE,
   surgery_time TIME,
-  treatment_type VARCHAR,
-  tooth_number VARCHAR,
+  procedure_type VARCHAR,
+  case_notes TEXT,
   status VARCHAR,
-  traffic_light_status VARCHAR,
+  traffic_light VARCHAR,
   reservation_count INTEGER,
   total_items_reserved INTEGER,
   items_ready INTEGER
@@ -191,23 +191,23 @@ BEGIN
   RETURN QUERY
   SELECT 
     c.id AS case_id,
-    p.name AS patient_name,
-    p.hn AS patient_hn,
-    c.surgery_date,
-    c.surgery_time,
-    c.treatment_type,
-    c.tooth_number,
+    p.full_name AS patient_name,
+    p.hn_number AS patient_hn,
+    c.scheduled_date,
+    c.scheduled_time,
+    c.procedure_type,
+    c.notes,
     c.status,
-    c.traffic_light_status,
+    c.traffic_light,
     (SELECT COUNT(*)::INTEGER FROM reservations r WHERE r.case_id = c.id) AS reservation_count,
-    (SELECT COALESCE(SUM(r.quantity_needed), 0)::INTEGER FROM reservations r WHERE r.case_id = c.id) AS total_items_reserved,
-    (SELECT COALESCE(SUM(r.quantity_allocated), 0)::INTEGER FROM reservations r WHERE r.case_id = c.id) AS items_ready
+    (SELECT COALESCE(SUM(r.quantity), 0)::INTEGER FROM reservations r WHERE r.case_id = c.id) AS total_items_reserved,
+    (SELECT COALESCE(SUM(r.quantity), 0)::INTEGER FROM reservations r WHERE r.case_id = c.id) AS items_ready
   FROM cases c
   JOIN patients p ON c.patient_id = p.id
   WHERE c.dentist_id = p_dentist_id
-    AND c.surgery_date BETWEEN p_start_date AND p_end_date
+    AND c.scheduled_date BETWEEN p_start_date AND p_end_date
     AND c.status != 'cancelled'
-  ORDER BY c.surgery_date ASC, c.surgery_time ASC;
+  ORDER BY c.scheduled_date ASC, c.scheduled_time ASC;
 END;
 $$;
 
@@ -224,10 +224,10 @@ CREATE OR REPLACE FUNCTION get_dentist_cases_by_date(
   patient_hn VARCHAR,
   patient_phone VARCHAR,
   surgery_time TIME,
-  treatment_type VARCHAR,
-  tooth_number VARCHAR,
+  procedure_type VARCHAR,
+  case_notes TEXT,
   status VARCHAR,
-  traffic_light_status VARCHAR,
+  traffic_light VARCHAR,
   notes TEXT,
   reservations JSONB
 )
@@ -237,34 +237,35 @@ BEGIN
   RETURN QUERY
   SELECT 
     c.id AS case_id,
-    p.name AS patient_name,
-    p.hn AS patient_hn,
+    p.full_name AS patient_name,
+    p.hn_number AS patient_hn,
     p.phone AS patient_phone,
-    c.surgery_time,
-    c.treatment_type,
-    c.tooth_number,
+    c.scheduled_time,
+    c.procedure_type,
+    c.notes,
     c.status,
-    c.traffic_light_status,
+    c.traffic_light,
     c.notes,
     (
       SELECT COALESCE(jsonb_agg(jsonb_build_object(
         'id', r.id,
         'product_name', pr.name,
         'product_ref', pr.ref_code,
-        'quantity_needed', r.quantity_needed,
-        'quantity_allocated', r.quantity_allocated,
+        'quantity', r.quantity,
+        'quantity_reserved', r.quantity,
         'status', r.status
       )), '[]'::JSONB)
       FROM reservations r
-      JOIN products pr ON r.product_id = pr.id
+      JOIN stock_items si ON r.stock_item_id = si.id
+      JOIN products pr ON si.product_id = pr.id
       WHERE r.case_id = c.id
     ) AS reservations
   FROM cases c
   JOIN patients p ON c.patient_id = p.id
   WHERE c.dentist_id = p_dentist_id
-    AND c.surgery_date = p_date
+    AND c.scheduled_date = p_date
     AND c.status != 'cancelled'
-  ORDER BY c.surgery_time ASC;
+  ORDER BY c.scheduled_time ASC;
 END;
 $$;
 
@@ -297,14 +298,15 @@ BEGIN
     pr.brand AS product_brand,
     cat.name AS category_name,
     COUNT(DISTINCT r.case_id) AS usage_count,
-    SUM(r.quantity_used)::BIGINT AS total_quantity,
-    MAX(c.surgery_date) AS last_used
+    SUM(r.quantity)::BIGINT AS total_quantity,
+    MAX(c.scheduled_date) AS last_used
   FROM reservations r
   JOIN cases c ON r.case_id = c.id
-  JOIN products pr ON r.product_id = pr.id
+  JOIN stock_items si ON r.stock_item_id = si.id
+  JOIN products pr ON si.product_id = pr.id
   JOIN categories cat ON pr.category_id = cat.id
   WHERE c.dentist_id = p_dentist_id
-    AND c.surgery_date >= CURRENT_DATE - (p_months || ' months')::INTERVAL
+    AND c.scheduled_date >= CURRENT_DATE - (p_months || ' months')::INTERVAL
     AND r.status = 'used'
   GROUP BY pr.id, pr.name, pr.ref_code, pr.brand, cat.name
   ORDER BY usage_count DESC, total_quantity DESC
@@ -343,33 +345,33 @@ BEGIN
       SELECT COUNT(*) FROM reservations r
       JOIN cases c ON r.case_id = c.id
       WHERE c.dentist_id = p_dentist_id
-        AND c.surgery_date BETWEEN v_start_date AND v_end_date
+        AND c.scheduled_date BETWEEN v_start_date AND v_end_date
     ),
     'used_as_reserved', (
       SELECT COUNT(*) FROM reservations r
       JOIN cases c ON r.case_id = c.id
       WHERE c.dentist_id = p_dentist_id
-        AND c.surgery_date BETWEEN v_start_date AND v_end_date
+        AND c.scheduled_date BETWEEN v_start_date AND v_end_date
         AND r.status = 'used'
-        AND r.quantity_used = r.quantity_needed
+        AND r.quantity = r.quantity
     ),
     'usage_rate', (
       SELECT ROUND(
-        (COUNT(*) FILTER (WHERE r.status = 'used' AND r.quantity_used = r.quantity_needed)::DECIMAL / 
+        (COUNT(*) FILTER (WHERE r.status = 'used' AND r.quantity = r.quantity)::DECIMAL / 
          NULLIF(COUNT(*), 0) * 100), 1
       )
       FROM reservations r
       JOIN cases c ON r.case_id = c.id
       WHERE c.dentist_id = p_dentist_id
-        AND c.surgery_date BETWEEN v_start_date AND v_end_date
+        AND c.scheduled_date BETWEEN v_start_date AND v_end_date
         AND r.status IN ('used', 'partial_used', 'cancelled')
     ),
     'avg_reservation_lead_time', (
-      SELECT ROUND(AVG(c.surgery_date - r.created_at::DATE), 1)
+      SELECT ROUND(AVG(c.scheduled_date - r.reserved_at::DATE), 1)
       FROM reservations r
       JOIN cases c ON r.case_id = c.id
       WHERE c.dentist_id = p_dentist_id
-        AND c.surgery_date BETWEEN v_start_date AND v_end_date
+        AND c.scheduled_date BETWEEN v_start_date AND v_end_date
     ),
     'oos_requests', (
       SELECT COUNT(*) FROM out_of_stock_requests oos
@@ -400,9 +402,9 @@ BEGIN
   SELECT jsonb_build_object(
     'total_cases', COUNT(*),
     'total_days', COUNT(DISTINCT surgery_date),
-    'green_cases', COUNT(*) FILTER (WHERE traffic_light_status = 'green'),
-    'yellow_cases', COUNT(*) FILTER (WHERE traffic_light_status = 'yellow'),
-    'red_cases', COUNT(*) FILTER (WHERE traffic_light_status = 'red'),
+    'green_cases', COUNT(*) FILTER (WHERE traffic_light = 'green'),
+    'yellow_cases', COUNT(*) FILTER (WHERE traffic_light = 'yellow'),
+    'red_cases', COUNT(*) FILTER (WHERE traffic_light = 'red'),
     'cases_by_date', (
       SELECT jsonb_agg(jsonb_build_object(
         'date', surgery_date,
@@ -415,9 +417,9 @@ BEGIN
         SELECT 
           surgery_date,
           COUNT(*) AS case_count,
-          COUNT(*) FILTER (WHERE traffic_light_status = 'green') AS green_count,
-          COUNT(*) FILTER (WHERE traffic_light_status = 'yellow') AS yellow_count,
-          COUNT(*) FILTER (WHERE traffic_light_status = 'red') AS red_count
+          COUNT(*) FILTER (WHERE traffic_light = 'green') AS green_count,
+          COUNT(*) FILTER (WHERE traffic_light = 'yellow') AS yellow_count,
+          COUNT(*) FILTER (WHERE traffic_light = 'red') AS red_count
         FROM cases
         WHERE dentist_id = p_dentist_id
           AND surgery_date BETWEEN p_start_date AND p_end_date
@@ -428,11 +430,11 @@ BEGIN
     ),
     'treatment_types', (
       SELECT jsonb_agg(jsonb_build_object(
-        'type', treatment_type,
+        'type', procedure_type,
         'count', type_count
       ))
       FROM (
-        SELECT treatment_type, COUNT(*) AS type_count
+        SELECT procedure_type, COUNT(*) AS type_count
         FROM cases
         WHERE dentist_id = p_dentist_id
           AND surgery_date BETWEEN p_start_date AND p_end_date
@@ -459,21 +461,21 @@ CREATE OR REPLACE VIEW dentist_today_cases AS
 SELECT 
   c.id AS case_id,
   c.dentist_id,
-  p.name AS patient_name,
-  p.hn AS patient_hn,
-  c.surgery_time,
-  c.treatment_type,
-  c.tooth_number,
+  p.full_name AS patient_name,
+  p.hn_number AS patient_hn,
+  c.scheduled_time,
+  c.procedure_type,
+  c.notes,
   c.status,
-  c.traffic_light_status,
+  c.traffic_light,
   (
     SELECT COUNT(*) FROM reservations r WHERE r.case_id = c.id
   ) AS reservation_count
 FROM cases c
 JOIN patients p ON c.patient_id = p.id
-WHERE c.surgery_date = CURRENT_DATE
+WHERE c.scheduled_date = CURRENT_DATE
   AND c.status != 'cancelled'
-ORDER BY c.surgery_time ASC;
+ORDER BY c.scheduled_time ASC;
 
 -- -----------------------------------------------------
 -- 10. RLS Policies for Dentist

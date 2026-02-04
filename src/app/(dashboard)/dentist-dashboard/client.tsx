@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useMemo, memo } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase/client';
 import dynamic from 'next/dynamic';
 
 // Static imports for critical above-the-fold icons only
@@ -246,7 +246,7 @@ const TimelineItem = memo(function TimelineItem({
 
 // Main Client Component
 export function DentistDashboardClient({ initialData }: { initialData: InitialData }) {
-  const supabase = createClientComponentClient();
+  const supabase = createClient();
   
   // State - initialized from server data
   const [stats, setStats] = useState<DentistStats | null>(initialData.stats);

@@ -1,12 +1,11 @@
 import { Suspense } from 'react';
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { createClient } from '@/lib/supabase/server';
 import { InventoryClient } from './client';
 import { InventorySkeleton } from './loading';
 
 // Server Component - Fetches initial data
 export default async function InventoryPage() {
-  const supabase = createServerComponentClient({ cookies });
+  const supabase = await createClient();
   
   // Fetch initial data in parallel on server
   const [inventoryResult, oosResult] = await Promise.all([

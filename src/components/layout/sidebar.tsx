@@ -15,6 +15,8 @@ import {
   BarChart3,
   Settings,
   X,
+  Boxes,
+  Bell,
 } from 'lucide-react'
 import { useMobileSidebar } from './mobile-sidebar-context'
 
@@ -33,10 +35,13 @@ const menuItems = [
   { href: '/calendar', label: 'ปฏิทินเคสผ่าตัด', icon: Calendar },
   { href: '/patients', label: 'รายชื่อคนไข้', icon: Users },
   { href: '/inventory', label: 'สต็อกวัสดุและรากเทียม', icon: Package },
+  { href: '/products', label: 'จัดการสินค้า', icon: Boxes },
   { href: '/reservations', label: 'การจองของสำหรับเคส', icon: ClipboardList },
+  { href: '/tasks', label: 'งานวันนี้ (Assistant)', icon: ClipboardList },
   { href: '/orders', label: 'ใบสั่งซื้อ', icon: ShoppingCart },
   { href: '/transfers', label: 'ยืม-คืน/แลกเปลี่ยนกับบริษัท', icon: ArrowLeftRight },
   { href: '/reports', label: 'รายงาน', icon: BarChart3 },
+  { href: '/notifications', label: 'การแจ้งเตือน', icon: Bell },
   { href: '/settings', label: 'ตั้งค่าระบบ', icon: Settings },
 ]
 

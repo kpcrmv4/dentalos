@@ -421,7 +421,7 @@ export default function CaseExecutePage() {
         .eq('stock_item_id', stealTarget.stock_item_id)
         .eq('status', 'reserved')
         .neq('case_id', caseId)
-        .single()
+        .single() as { data: { id: string } | null }
 
       if (sourceReservation) {
         // @ts-expect-error - RPC function types are defined in database

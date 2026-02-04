@@ -176,9 +176,9 @@ BEGIN
     RETURNING id INTO v_po1_id;
 
     -- Get PO IDs for items
-    SELECT id INTO v_po1_id FROM purchase_orders WHERE po_number = 'PO-2026-0001';
-    SELECT id INTO v_po2_id FROM purchase_orders WHERE po_number = 'PO-2026-0002';
-    SELECT id INTO v_po3_id FROM purchase_orders WHERE po_number = 'PO-2026-0003';
+    SELECT id INTO v_po1_id FROM purchase_orders WHERE po_number = 'PO-2026-0001' LIMIT 1;
+    SELECT id INTO v_po2_id FROM purchase_orders WHERE po_number = 'PO-2026-0002' LIMIT 1;
+    SELECT id INTO v_po3_id FROM purchase_orders WHERE po_number = 'PO-2026-0003' LIMIT 1;
 
     -- Insert PO items
     IF v_po1_id IS NOT NULL THEN

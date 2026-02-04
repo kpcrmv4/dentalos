@@ -164,8 +164,8 @@ $$;
 CREATE OR REPLACE FUNCTION receive_from_purchase_order(
   p_po_id UUID,
   p_received_by UUID,
-  p_invoice_number VARCHAR DEFAULT NULL,
-  p_items JSONB -- [{ po_item_id, lot_number, expiry_date, quantity_received, location, cost_price }]
+  p_items JSONB, -- [{ po_item_id, lot_number, expiry_date, quantity_received, location, cost_price }]
+  p_invoice_number VARCHAR DEFAULT NULL
 ) RETURNS JSONB
 LANGUAGE plpgsql
 AS $$

@@ -10,7 +10,11 @@
 -- - RED: Has reservations but materials are short OR No reservations at all
 -- =====================================================
 
--- Drop existing function and recreate with correct logic
+-- Drop existing functions first to avoid return type conflicts
+DROP FUNCTION IF EXISTS update_case_traffic_light(UUID);
+DROP FUNCTION IF EXISTS daily_update_traffic_lights();
+
+-- Recreate update_case_traffic_light with correct logic
 CREATE OR REPLACE FUNCTION update_case_traffic_light(p_case_id UUID)
 RETURNS void AS $$
 DECLARE

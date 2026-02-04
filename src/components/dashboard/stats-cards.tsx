@@ -1,12 +1,11 @@
 import { Calendar, Clock, AlertTriangle, Package } from 'lucide-react'
 
 export async function StatsCards() {
-  // TODO: Replace with actual Supabase queries after database setup
-  // For now, use mock data to allow build to pass
-  const monthCases = 0
-  const pendingCases = 0
-  const redCases = 0
-  const lowStockCount = 3
+  // Mock data matching calendar page - will be replaced with Supabase queries
+  const monthCases = 3      // 3 cases in February
+  const pendingCases = 2    // 2 cases scheduled (Feb 4 and Feb 5)
+  const redCases = 1        // 1 case with red status (missing materials)
+  const lowStockCount = 3   // Low stock items
 
   const stats = [
     {

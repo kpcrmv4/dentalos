@@ -21,8 +21,27 @@ export async function CaseCalendar() {
   const firstDay = new Date(year, month, 1)
   const lastDay = new Date(year, month + 1, 0)
 
-  // Mock cases data for initial build
-  const cases: Case[] = []
+  // Mock cases data matching calendar page
+  const cases: Case[] = [
+    {
+      id: '1',
+      scheduled_date: '2026-02-04',
+      traffic_light: 'green',
+      patient: { full_name: 'คุณสมศักดิ์ ใจดี' },
+    },
+    {
+      id: '2',
+      scheduled_date: '2026-02-04',
+      traffic_light: 'yellow',
+      patient: { full_name: 'คุณมาลี สุขใจ' },
+    },
+    {
+      id: '3',
+      scheduled_date: '2026-02-05',
+      traffic_light: 'red',
+      patient: { full_name: 'คุณประสิทธิ์ มั่นคง' },
+    },
+  ]
 
   // Create calendar grid
   const startDayOfWeek = firstDay.getDay()

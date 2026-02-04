@@ -142,38 +142,9 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- =============================================
--- Apply Audit Triggers to Important Tables
+-- NOTE: Audit Triggers are created in seed_data.sql
+-- to avoid errors during data seeding
 -- =============================================
-
--- Stock Items
-DROP TRIGGER IF EXISTS audit_stock_items ON stock_items;
-CREATE TRIGGER audit_stock_items
-  AFTER INSERT OR UPDATE OR DELETE ON stock_items
-  FOR EACH ROW EXECUTE FUNCTION audit_trigger_func();
-
--- Reservations
-DROP TRIGGER IF EXISTS audit_reservations ON reservations;
-CREATE TRIGGER audit_reservations
-  AFTER INSERT OR UPDATE OR DELETE ON reservations
-  FOR EACH ROW EXECUTE FUNCTION audit_trigger_func();
-
--- Purchase Orders
-DROP TRIGGER IF EXISTS audit_purchase_orders ON purchase_orders;
-CREATE TRIGGER audit_purchase_orders
-  AFTER INSERT OR UPDATE OR DELETE ON purchase_orders
-  FOR EACH ROW EXECUTE FUNCTION audit_trigger_func();
-
--- Cases
-DROP TRIGGER IF EXISTS audit_cases ON cases;
-CREATE TRIGGER audit_cases
-  AFTER INSERT OR UPDATE OR DELETE ON cases
-  FOR EACH ROW EXECUTE FUNCTION audit_trigger_func();
-
--- Products
-DROP TRIGGER IF EXISTS audit_products ON products;
-CREATE TRIGGER audit_products
-  AFTER INSERT OR UPDATE OR DELETE ON products
-  FOR EACH ROW EXECUTE FUNCTION audit_trigger_func();
 
 -- =============================================
 -- Stock Receive Table (for tracking stock receives)

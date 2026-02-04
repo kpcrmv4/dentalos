@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { LogOut, Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { NotificationDropdown } from '@/components/ui/notification-dropdown'
+import { useMobileSidebar } from './mobile-sidebar-context'
 
 interface HeaderProps {
   profile: {
@@ -18,6 +19,7 @@ interface HeaderProps {
 
 export function Header({ profile }: HeaderProps) {
   const router = useRouter()
+  const { toggle } = useMobileSidebar()
 
   const handleLogout = async () => {
     const supabase = createClient()
@@ -29,7 +31,11 @@ export function Header({ profile }: HeaderProps) {
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white px-6">
       {/* Mobile menu button */}
-      <button className="lg:hidden p-2 rounded-lg hover:bg-slate-100">
+      <button
+        onClick={toggle}
+        className="lg:hidden p-2 rounded-lg hover:bg-slate-100"
+        aria-label="Toggle menu"
+      >
         <Menu className="h-5 w-5 text-slate-600" />
       </button>
 

@@ -312,8 +312,8 @@ BEGIN
     p_po_id,
     'normal'
   FROM profiles pr
-  JOIN user_roles ur ON pr.id = ur.user_id
-  WHERE ur.role_id = (SELECT id FROM roles WHERE name = 'inventory');
+  JOIN roles r ON pr.role_id = r.id
+  WHERE r.name = 'inventory' AND pr.is_active = true;
   
   RETURN jsonb_build_object(
     'success', true,
@@ -443,9 +443,9 @@ ON stock_items FOR INSERT
 TO authenticated
 WITH CHECK (
   EXISTS (
-    SELECT 1 FROM user_roles ur
-    JOIN roles r ON ur.role_id = r.id
-    WHERE ur.user_id = auth.uid()
+    SELECT 1 FROM profiles p
+    JOIN roles r ON p.role_id = r.id
+    WHERE p.id = auth.uid()
     AND r.name IN ('inventory', 'admin')
   )
 );

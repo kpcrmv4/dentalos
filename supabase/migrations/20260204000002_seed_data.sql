@@ -8,6 +8,13 @@
 -- Note: You must first create a user in Supabase Auth Dashboard
 -- Then get their UUID and replace 'YOUR_USER_UUID' below
 
+-- Disable audit triggers during seed data insertion
+DROP TRIGGER IF EXISTS audit_products ON products;
+DROP TRIGGER IF EXISTS audit_stock_items ON stock_items;
+DROP TRIGGER IF EXISTS audit_cases ON cases;
+DROP TRIGGER IF EXISTS audit_reservations ON reservations;
+DROP TRIGGER IF EXISTS audit_purchase_orders ON purchase_orders;
+
 -- =====================================================
 -- 1. SAMPLE PRODUCTS
 -- =====================================================
@@ -244,3 +251,28 @@ BEGIN
     WHERE NOT EXISTS (SELECT 1 FROM notifications WHERE user_id = v_user_id AND title = t.title);
   END IF;
 END $$;
+
+-- =====================================================
+-- 8. RE-ENABLE AUDIT TRIGGERS
+-- =====================================================
+
+-- Re-create audit triggers after seed data insertion
+CREATE TRIGGER audit_products
+  AFTER INSERT OR UPDATE OR DELETE ON products
+  FOR EACH ROW EXECUTE FUNCTION audit_trigger_func();
+
+CREATE TRIGGER audit_stock_items
+  AFTER INSERT OR UPDATE OR DELETE ON stock_items
+  FOR EACH ROW EXECUTE FUNCTION audit_trigger_func();
+
+CREATE TRIGGER audit_cases
+  AFTER INSERT OR UPDATE OR DELETE ON cases
+  FOR EACH ROW EXECUTE FUNCTION audit_trigger_func();
+
+CREATE TRIGGER audit_reservations
+  AFTER INSERT OR UPDATE OR DELETE ON reservations
+  FOR EACH ROW EXECUTE FUNCTION audit_trigger_func();
+
+CREATE TRIGGER audit_purchase_orders
+  AFTER INSERT OR UPDATE OR DELETE ON purchase_orders
+  FOR EACH ROW EXECUTE FUNCTION audit_trigger_func();

@@ -1,24 +1,24 @@
 -- =============================================
--- Notifications Table
+-- Notifications Table - Add missing columns
 -- =============================================
-CREATE TABLE IF NOT EXISTS notifications (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  type VARCHAR(50) NOT NULL,
-  title VARCHAR(255) NOT NULL,
-  message TEXT NOT NULL,
-  data JSONB DEFAULT '{}',
-  is_read BOOLEAN DEFAULT FALSE,
-  target_roles TEXT[] DEFAULT NULL,
-  target_user_id UUID REFERENCES profiles(id) ON DELETE CASCADE DEFAULT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  read_at TIMESTAMPTZ DEFAULT NULL
-);
+-- Note: notifications table already exists in init.sql with user_id column
+-- We need to add target_user_id and target_roles columns
 
--- Index for faster queries
+-- Add new columns to existing notifications table
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS target_roles TEXT[] DEFAULT NULL;
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS target_user_id UUID REFERENCES profiles(id) ON DELETE CASCADE DEFAULT NULL;
+
+-- Create indexes for new columns
 CREATE INDEX IF NOT EXISTS idx_notifications_target_user ON notifications(target_user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
 CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_target_roles ON notifications USING GIN(target_roles);
+
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Users can read own notifications" ON notifications;
+DROP POLICY IF EXISTS "Users can update own notifications" ON notifications;
+DROP POLICY IF EXISTS "Users can delete own notifications" ON notifications;
+DROP POLICY IF EXISTS "Service can insert notifications" ON notifications;
 
 -- RLS Policies for notifications
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
@@ -27,15 +27,17 @@ ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can read own notifications" ON notifications
   FOR SELECT
   USING (
+    user_id = auth.uid() OR
     target_user_id = auth.uid() OR
     target_roles && ARRAY[(SELECT r.name FROM roles r JOIN profiles p ON p.role_id = r.id WHERE p.id = auth.uid())] OR
-    (target_user_id IS NULL AND target_roles IS NULL)
+    (target_user_id IS NULL AND target_roles IS NULL AND user_id IS NULL)
   );
 
 -- Users can update (mark as read) their own notifications
 CREATE POLICY "Users can update own notifications" ON notifications
   FOR UPDATE
   USING (
+    user_id = auth.uid() OR
     target_user_id = auth.uid() OR
     target_roles && ARRAY[(SELECT r.name FROM roles r JOIN profiles p ON p.role_id = r.id WHERE p.id = auth.uid())]
   );
@@ -44,6 +46,7 @@ CREATE POLICY "Users can update own notifications" ON notifications
 CREATE POLICY "Users can delete own notifications" ON notifications
   FOR DELETE
   USING (
+    user_id = auth.uid() OR
     target_user_id = auth.uid() OR
     target_roles && ARRAY[(SELECT r.name FROM roles r JOIN profiles p ON p.role_id = r.id WHERE p.id = auth.uid())]
   );
@@ -81,6 +84,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
 -- RLS for audit logs (admin only)
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admins can read audit logs" ON audit_logs;
 CREATE POLICY "Admins can read audit logs" ON audit_logs
   FOR SELECT
   USING (
@@ -207,9 +211,11 @@ CREATE INDEX IF NOT EXISTS idx_stock_receive_items_receive ON stock_receive_item
 ALTER TABLE stock_receives ENABLE ROW LEVEL SECURITY;
 ALTER TABLE stock_receive_items ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Authenticated users can read stock receives" ON stock_receives;
 CREATE POLICY "Authenticated users can read stock receives" ON stock_receives
   FOR SELECT USING (auth.uid() IS NOT NULL);
 
+DROP POLICY IF EXISTS "Inventory and admin can insert stock receives" ON stock_receives;
 CREATE POLICY "Inventory and admin can insert stock receives" ON stock_receives
   FOR INSERT WITH CHECK (
     EXISTS (
@@ -219,9 +225,11 @@ CREATE POLICY "Inventory and admin can insert stock receives" ON stock_receives
     )
   );
 
+DROP POLICY IF EXISTS "Authenticated users can read stock receive items" ON stock_receive_items;
 CREATE POLICY "Authenticated users can read stock receive items" ON stock_receive_items
   FOR SELECT USING (auth.uid() IS NOT NULL);
 
+DROP POLICY IF EXISTS "Inventory and admin can insert stock receive items" ON stock_receive_items;
 CREATE POLICY "Inventory and admin can insert stock receive items" ON stock_receive_items
   FOR INSERT WITH CHECK (
     EXISTS (

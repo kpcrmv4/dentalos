@@ -311,19 +311,21 @@ export default function CaseExecutePage() {
 
       if (quantityUsed === actionState.reservation.quantity) {
         // Use full quantity
+        // @ts-expect-error - RPC function types are defined in database
         await supabase.rpc('use_reserved_stock', {
           p_reservation_id: actionState.reservation.id,
-          p_photo_url: photoUrl,
-          p_user_id: user?.id
+          p_photo_url: photoUrl || null,
+          p_user_id: user?.id || null
         })
       } else {
         // Partial use
+        // @ts-expect-error - RPC function types are defined in database
         await supabase.rpc('partial_use_reservation', {
           p_reservation_id: actionState.reservation.id,
           p_quantity_used: quantityUsed,
-          p_photo_url: photoUrl,
+          p_photo_url: photoUrl || null,
           p_reason: reason || 'Partial use',
-          p_user_id: user?.id
+          p_user_id: user?.id || null
         })
       }
 
@@ -345,10 +347,11 @@ export default function CaseExecutePage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
 
+      // @ts-expect-error - RPC function types are defined in database
       await supabase.rpc('cancel_reservation', {
         p_reservation_id: actionState.reservation.id,
-        p_reason: reason,
-        p_user_id: user?.id
+        p_reason: reason || null,
+        p_user_id: user?.id || null
       })
 
       await fetchReservations()
@@ -383,12 +386,13 @@ export default function CaseExecutePage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
 
+      // @ts-expect-error - RPC function types are defined in database
       await supabase.rpc('swap_reservation_stock', {
         p_reservation_id: actionState.reservation.id,
         p_new_stock_item_id: selectedNewStock,
         p_new_quantity: newQuantity,
         p_reason: reason || 'Stock swap',
-        p_user_id: user?.id
+        p_user_id: user?.id || null
       })
 
       await fetchReservations()
@@ -420,12 +424,13 @@ export default function CaseExecutePage() {
         .single()
 
       if (sourceReservation) {
+        // @ts-expect-error - RPC function types are defined in database
         await supabase.rpc('steal_reservation', {
           p_target_case_id: caseId,
           p_source_reservation_id: sourceReservation.id,
           p_quantity: newQuantity,
           p_reason: reason || 'Urgent need - doctor confirmed',
-          p_user_id: user?.id
+          p_user_id: user?.id || null
         })
       }
 
@@ -450,13 +455,14 @@ export default function CaseExecutePage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
 
+      // @ts-expect-error - RPC function types are defined in database
       await supabase.rpc('use_unreserved_stock', {
         p_case_id: caseId,
         p_stock_item_id: selectedNewStock,
         p_quantity: newQuantity,
-        p_photo_url: photoUrl,
+        p_photo_url: photoUrl || null,
         p_reason: reason || 'Additional material needed',
-        p_user_id: user?.id
+        p_user_id: user?.id || null
       })
 
       await fetchReservations()

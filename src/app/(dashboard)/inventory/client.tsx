@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 
 // Static imports for critical above-the-fold icons
 import { Package, Plus, Search, AlertTriangle, Download } from 'lucide-react';
-import { EmergencyAlert } from '@/components/dashboard/emergency-alert';
+// EmergencyAlert moved to Reservations page
 
 // Dynamic imports for less critical icons
 const Loader2 = dynamic(() => import('lucide-react').then(mod => mod.Loader2), { ssr: false });
@@ -366,8 +366,7 @@ export function InventoryClient({ initialData }: { initialData: InitialData }) {
         </div>
       </div>
 
-      {/* Emergency Alert */}
-      <EmergencyAlert />
+      {/* Emergency Alert moved to Reservations page */}
 
       {/* Dashboard Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">

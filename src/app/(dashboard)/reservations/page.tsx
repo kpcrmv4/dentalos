@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Search, Check, X, Clock, Camera, Loader2 } from 'lucide-react'
+import { Plus, Search, Check, X, Clock, Camera, Loader2, Package, Calendar, AlertTriangle, CheckCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { CreateReservationForm } from '@/components/forms/create-reservation-form'
 import { Modal, Button } from '@/components/ui/modal'
+import { EmergencyAlert } from '@/components/dashboard/emergency-alert'
 
 interface Reservation {
   id: string
@@ -195,8 +196,11 @@ export default function ReservationsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">การจองของสำหรับเคส</h1>
-          <p className="text-slate-500 mt-1">จัดการการจองวัสดุและรากเทียมสำหรับเคสผ่าตัด</p>
+          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <Package className="w-7 h-7 text-indigo-600" />
+            เตรียมวัสดุ
+          </h1>
+          <p className="text-slate-500 mt-1">เตรียมวัสดุสำหรับเคสผ่าตัดตามรายการจอง</p>
         </div>
         <button
           onClick={() => setIsCreateModalOpen(true)}
@@ -207,22 +211,37 @@ export default function ReservationsPage() {
         </button>
       </div>
 
+      {/* Emergency Alert */}
+      <EmergencyAlert />
+
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4">
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-          <p className="text-sm text-slate-500">รอจอง</p>
-          <p className="text-2xl font-bold text-slate-900 mt-1">{stats.pending}</p>
+          <div className="flex items-center gap-2">
+            <Clock className="w-5 h-5 text-amber-500" />
+            <p className="text-sm text-slate-500">รอเตรียม</p>
+          </div>
+          <p className="text-2xl font-bold text-amber-600 mt-1">{stats.reserved}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-          <p className="text-sm text-slate-500">จองแล้ว</p>
-          <p className="text-2xl font-bold text-indigo-600 mt-1">{stats.reserved}</p>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-          <p className="text-sm text-slate-500">ใช้แล้ววันนี้</p>
+          <div className="flex items-center gap-2">
+            <CheckCircle className="w-5 h-5 text-emerald-500" />
+            <p className="text-sm text-slate-500">เตรียมแล้ว</p>
+          </div>
           <p className="text-2xl font-bold text-emerald-600 mt-1">{stats.usedToday}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-          <p className="text-sm text-slate-500">ยกเลิก</p>
+          <div className="flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-indigo-500" />
+            <p className="text-sm text-slate-500">เคสวันนี้</p>
+          </div>
+          <p className="text-2xl font-bold text-indigo-600 mt-1">{reservations.filter(r => r.case.scheduled_date === new Date().toISOString().split('T')[0]).length}</p>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-red-500" />
+            <p className="text-sm text-slate-500">ยกเลิก</p>
+          </div>
           <p className="text-2xl font-bold text-red-600 mt-1">{stats.cancelled}</p>
         </div>
       </div>
@@ -274,12 +293,13 @@ export default function ReservationsPage() {
           <table className="w-full">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="w-10 px-4 py-3"></th>
                 <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">เคส</th>
                 <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">สินค้า</th>
                 <th className="text-center px-4 py-3 text-sm font-semibold text-slate-600">จำนวน</th>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">วันนัด</th>
+                <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">วันผ่าตัด</th>
                 <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">สถานะ</th>
-                <th className="px-4 py-3"></th>
+                <th className="px-4 py-3 text-sm font-semibold text-slate-600">ดำเนินการ</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
@@ -287,7 +307,14 @@ export default function ReservationsPage() {
                 const status = statusConfig[reservation.status as keyof typeof statusConfig]
                 const StatusIcon = status?.icon || Clock
                 return (
-                  <tr key={reservation.id} className="hover:bg-slate-50">
+                  <tr key={reservation.id} className={`hover:bg-slate-50 ${reservation.status === 'used' ? 'bg-emerald-50' : ''}`}>
+                    <td className="px-4 py-3">
+                      {reservation.status === 'used' ? (
+                        <CheckCircle className="w-5 h-5 text-emerald-600" />
+                      ) : (
+                        <div className="w-5 h-5 border-2 border-slate-300 rounded" />
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <div>
                         <p className="font-medium text-slate-900">{reservation.case.case_number}</p>
@@ -332,9 +359,10 @@ export default function ReservationsPage() {
                           <>
                             <button
                               onClick={() => handleUseReservation(reservation)}
-                              className="px-3 py-1 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+                              className="px-3 py-1 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center gap-1"
                             >
-                              บันทึกใช้งาน
+                              <Check className="w-4 h-4" />
+                              เตรียมแล้ว
                             </button>
                             <button
                               onClick={() => handleCancelReservation(reservation)}
@@ -343,6 +371,9 @@ export default function ReservationsPage() {
                               ยกเลิก
                             </button>
                           </>
+                        )}
+                        {reservation.status === 'used' && (
+                          <span className="text-sm text-emerald-600 font-medium">เตรียมแล้ว</span>
                         )}
                       </div>
                     </td>
@@ -362,7 +393,7 @@ export default function ReservationsPage() {
       />
 
       {/* Use Reservation Modal */}
-      <Modal isOpen={isUseModalOpen} onClose={() => setIsUseModalOpen(false)} title="บันทึกการใช้งาน" size="md">
+      <Modal isOpen={isUseModalOpen} onClose={() => setIsUseModalOpen(false)} title="ยืนยันการเตรียมวัสดุ" size="md">
         <div className="p-6 space-y-4">
           {selectedReservation && (
             <>
@@ -399,7 +430,7 @@ export default function ReservationsPage() {
                 <Button variant="secondary" onClick={() => setIsUseModalOpen(false)}>
                   ยกเลิก
                 </Button>
-                <Button onClick={handleConfirmUse}>ยืนยันการใช้งาน</Button>
+                <Button onClick={handleConfirmUse}>ยืนยันเตรียมแล้ว</Button>
               </div>
             </>
           )}

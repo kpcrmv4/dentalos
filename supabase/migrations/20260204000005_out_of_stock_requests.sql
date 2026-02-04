@@ -138,8 +138,8 @@ CREATE OR REPLACE FUNCTION request_out_of_stock_item(
   p_case_id UUID,
   p_product_id UUID,
   p_quantity INTEGER,
-  p_urgency_level VARCHAR DEFAULT 'normal',
-  p_user_id UUID
+  p_user_id UUID,
+  p_urgency_level VARCHAR DEFAULT 'normal'
 ) RETURNS UUID AS $$
 DECLARE
   v_request_id UUID;

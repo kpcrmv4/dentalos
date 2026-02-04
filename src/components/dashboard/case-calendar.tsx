@@ -15,19 +15,29 @@ type CaseData = {
 }
 
 export function CaseCalendar() {
-  const [currentDate, setCurrentDate] = useState(new Date())
+  // Use null initial state to avoid hydration mismatch
+  const [currentDate, setCurrentDate] = useState<Date | null>(null)
   const [cases, setCases] = useState<CaseData[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
   const [showModal, setShowModal] = useState(false)
+  const [isClient, setIsClient] = useState(false)
 
-  const year = currentDate.getFullYear()
-  const month = currentDate.getMonth()
+  // Initialize date on client side only
+  useEffect(() => {
+    setCurrentDate(new Date())
+    setIsClient(true)
+  }, [])
+
+  const year = currentDate?.getFullYear() || new Date().getFullYear()
+  const month = currentDate?.getMonth() || new Date().getMonth()
 
   // Fetch cases when month changes
   useEffect(() => {
-    fetchCases()
-  }, [year, month])
+    if (isClient) {
+      fetchCases()
+    }
+  }, [year, month, isClient])
 
   const fetchCases = async () => {
     setLoading(true)
@@ -108,10 +118,10 @@ export function CaseCalendar() {
     casesByDate[day].push(c)
   })
 
-  const monthName = currentDate.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' })
+  const monthName = currentDate?.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' }) || ''
   const weekDays = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส']
-  const today = new Date()
-  const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month
+  const todayDate = new Date()
+  const isCurrentMonth = todayDate.getFullYear() === year && todayDate.getMonth() === month
 
   // Get selected day cases
   const selectedDayCases = selectedDay ? casesByDate[selectedDay] || [] : []
@@ -215,7 +225,7 @@ export function CaseCalendar() {
               {/* Days grid */}
               <div className="grid grid-cols-7 gap-1">
                 {calendarDays.map((day, index) => {
-                  const isToday = isCurrentMonth && day === today.getDate()
+                  const isToday = isCurrentMonth && day === todayDate.getDate()
                   const isSelected = day === selectedDay
                   const dayCases = day ? casesByDate[day] || [] : []
                   const hasGreen = dayCases.some((c) => c.traffic_light === 'green')

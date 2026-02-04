@@ -59,6 +59,8 @@ export default function ReservationsPage() {
   const [reservations, setReservations] = useState<Reservation[]>([])
   const [stats, setStats] = useState<Stats>({ pending: 0, reserved: 0, usedToday: 0, cancelled: 0 })
   const [loading, setLoading] = useState(true)
+  const [todayStr, setTodayStr] = useState<string>('')
+  const [todayCasesCount, setTodayCasesCount] = useState(0)
 
   const fetchReservations = async () => {
     setLoading(true)
@@ -115,10 +117,18 @@ export default function ReservationsPage() {
     })
 
     setStats({ pending, reserved, usedToday, cancelled })
+    
+    // Calculate today's cases count
+    const todayDate = new Date().toISOString().split('T')[0]
+    const todayCases = items.filter(r => r.case.scheduled_date === todayDate).length
+    setTodayCasesCount(todayCases)
+    
     setLoading(false)
   }
 
   useEffect(() => {
+    // Set today string on client side to avoid hydration mismatch
+    setTodayStr(new Date().toISOString().split('T')[0])
     fetchReservations()
   }, [])
 
@@ -235,7 +245,7 @@ export default function ReservationsPage() {
             <Calendar className="w-5 h-5 text-indigo-500" />
             <p className="text-sm text-slate-500">เคสวันนี้</p>
           </div>
-          <p className="text-2xl font-bold text-indigo-600 mt-1">{reservations.filter(r => r.case.scheduled_date === new Date().toISOString().split('T')[0]).length}</p>
+          <p className="text-2xl font-bold text-indigo-600 mt-1">{todayCasesCount}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
           <div className="flex items-center gap-2">

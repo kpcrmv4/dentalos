@@ -16,18 +16,30 @@ type CaseData = {
 }
 
 export function DashboardClient() {
-  const [currentDate, setCurrentDate] = useState(new Date())
+  // Use null initial state to avoid hydration mismatch
+  const [currentDate, setCurrentDate] = useState<Date | null>(null)
   const [cases, setCases] = useState<CaseData[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedDay, setSelectedDay] = useState<number>(new Date().getDate()) // Default to today
+  const [selectedDay, setSelectedDay] = useState<number | null>(null)
+  const [isClient, setIsClient] = useState(false)
 
-  const year = currentDate.getFullYear()
-  const month = currentDate.getMonth()
+  // Initialize date on client side only
+  useEffect(() => {
+    const now = new Date()
+    setCurrentDate(now)
+    setSelectedDay(now.getDate())
+    setIsClient(true)
+  }, [])
+
+  const year = currentDate?.getFullYear() || new Date().getFullYear()
+  const month = currentDate?.getMonth() || new Date().getMonth()
 
   // Fetch cases when month changes
   useEffect(() => {
-    fetchCases()
-  }, [year, month])
+    if (isClient) {
+      fetchCases()
+    }
+  }, [year, month, isClient])
 
   const fetchCases = async () => {
     setLoading(true)
@@ -108,10 +120,10 @@ export function DashboardClient() {
     casesByDate[day].push(c)
   })
 
-  const monthName = currentDate.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' })
+  const monthName = currentDate?.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' }) || ''
   const weekDays = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส']
-  const today = new Date()
-  const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month
+  const todayDate = new Date()
+  const isCurrentMonth = todayDate.getFullYear() === year && todayDate.getMonth() === month
 
   // Get selected day cases
   const selectedDayCases = selectedDay ? casesByDate[selectedDay] || [] : []
@@ -122,6 +134,7 @@ export function DashboardClient() {
       case 'green': return 'bg-green-500'
       case 'yellow': return 'bg-amber-500'
       case 'red': return 'bg-red-500'
+      case 'gray': return 'bg-slate-400'
       default: return 'bg-slate-300'
     }
   }
@@ -129,8 +142,9 @@ export function DashboardClient() {
   const getTrafficLightText = (light: string) => {
     switch (light) {
       case 'green': return 'วัสดุพร้อม'
-      case 'yellow': return 'รอยืนยัน'
+      case 'yellow': return 'รอของเข้า'
       case 'red': return 'วัสดุไม่พร้อม'
+      case 'gray': return 'ยังไม่จอง'
       default: return 'ไม่ระบุ'
     }
   }
@@ -170,11 +184,15 @@ export function DashboardClient() {
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-amber-500" />
-                  รอยืนยัน
+                  รอของเข้า
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-red-500" />
                   ไม่พร้อม
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-slate-400" />
+                  ยังไม่จอง
                 </span>
               </div>
             </div>
@@ -222,12 +240,13 @@ export function DashboardClient() {
                 {/* Days grid */}
                 <div className="grid grid-cols-7 gap-1">
                   {calendarDays.map((day, index) => {
-                    const isToday = isCurrentMonth && day === today.getDate()
+                    const isToday = isCurrentMonth && day === todayDate.getDate()
                     const isSelected = day === selectedDay
                     const dayCases = day ? casesByDate[day] || [] : []
                     const hasGreen = dayCases.some((c) => c.traffic_light === 'green')
                     const hasRed = dayCases.some((c) => c.traffic_light === 'red')
                     const hasYellow = dayCases.some((c) => c.traffic_light === 'yellow')
+                    const hasGray = dayCases.some((c) => c.traffic_light === 'gray' || !c.traffic_light)
                     const dayOfWeek = (startDayOfWeek + (day || 0) - 1) % 7
 
                     return (
@@ -264,6 +283,9 @@ export function DashboardClient() {
                                 )}
                                 {hasRed && (
                                   <span className="w-2 h-2 rounded-full bg-red-500" />
+                                )}
+                                {hasGray && (
+                                  <span className="w-2 h-2 rounded-full bg-slate-400" />
                                 )}
                               </div>
                             )}

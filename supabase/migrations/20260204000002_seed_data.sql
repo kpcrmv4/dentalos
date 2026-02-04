@@ -212,10 +212,16 @@ BEGIN
       WHERE c.status = 'scheduled'
       LIMIT 3
     LOOP
-      -- Get a random stock item
+      -- Get a random stock item (use different stock for each case)
       SELECT s.id as stock_id INTO v_stock
       FROM stock_items s
-      WHERE s.status = 'active' AND s.quantity > s.reserved_quantity
+      WHERE s.status = 'active' 
+        AND s.quantity > s.reserved_quantity
+        AND NOT EXISTS (
+          SELECT 1 FROM reservations r 
+          WHERE r.stock_item_id = s.id AND r.case_id = v_case.case_id
+        )
+      ORDER BY RANDOM()
       LIMIT 1;
 
       IF v_stock IS NOT NULL THEN

@@ -1,62 +1,45 @@
 'use client'
 
-import { useState } from 'react'
-import { Plus, Search, Check, X, Clock, Camera } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Plus, Search, Check, X, Clock, Camera, Loader2 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 import { CreateReservationForm } from '@/components/forms/create-reservation-form'
 import { Modal, Button } from '@/components/ui/modal'
 
-// Mock data for reservations
-const mockReservations = [
-  {
-    id: '1',
-    case_number: 'C2026-0001',
-    patient_name: 'คุณสมศักดิ์ ใจดี',
-    dentist_name: 'ทพ.วิชัย',
-    scheduled_date: '2026-02-04',
-    product_name: 'Straumann BLT Implant 4.1x10mm',
-    lot_number: 'LOT-2026-001',
-    quantity: 1,
-    status: 'reserved',
-    reserved_at: '2026-02-01T10:30:00',
-  },
-  {
-    id: '2',
-    case_number: 'C2026-0001',
-    patient_name: 'คุณสมศักดิ์ ใจดี',
-    dentist_name: 'ทพ.วิชัย',
-    scheduled_date: '2026-02-04',
-    product_name: 'Bio-Oss Bone Graft 0.5g',
-    lot_number: 'LOT-2026-003',
-    quantity: 2,
-    status: 'reserved',
-    reserved_at: '2026-02-01T10:30:00',
-  },
-  {
-    id: '3',
-    case_number: 'C2026-0002',
-    patient_name: 'คุณมาลี สุขใจ',
-    dentist_name: 'ทพ.สมหญิง',
-    scheduled_date: '2026-02-04',
-    product_name: 'Nobel Active Implant 3.5x10mm',
-    lot_number: 'LOT-2026-002',
-    quantity: 1,
-    status: 'used',
-    reserved_at: '2026-02-02T14:00:00',
-    used_at: '2026-02-04T09:15:00',
-  },
-  {
-    id: '4',
-    case_number: 'C2026-0003',
-    patient_name: 'คุณประสิทธิ์ มั่นคง',
-    dentist_name: 'ทพ.วิชัย',
-    scheduled_date: '2026-02-05',
-    product_name: 'Osstem TS III Implant 4.0x12mm',
-    lot_number: 'LOT-2026-004',
-    quantity: 2,
-    status: 'reserved',
-    reserved_at: '2026-02-03T16:45:00',
-  },
-]
+interface Reservation {
+  id: string
+  quantity: number
+  status: string
+  reserved_at: string
+  used_at: string | null
+  stock_item: {
+    id: string
+    lot_number: string
+    product: {
+      name: string
+      sku: string
+      size: string | null
+    }
+  }
+  case: {
+    id: string
+    case_number: string
+    scheduled_date: string
+    patient: {
+      full_name: string
+    }
+    dentist: {
+      full_name: string
+    } | null
+  }
+}
+
+interface Stats {
+  pending: number
+  reserved: number
+  usedToday: number
+  cancelled: number
+}
 
 const statusConfig = {
   pending: { label: 'รอจอง', icon: Clock, className: 'bg-slate-100 text-slate-700' },
@@ -68,32 +51,143 @@ const statusConfig = {
 export default function ReservationsPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isUseModalOpen, setIsUseModalOpen] = useState(false)
-  const [selectedReservation, setSelectedReservation] = useState<(typeof mockReservations)[0] | null>(null)
+  const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [dateFilter, setDateFilter] = useState('')
+  const [reservations, setReservations] = useState<Reservation[]>([])
+  const [stats, setStats] = useState<Stats>({ pending: 0, reserved: 0, usedToday: 0, cancelled: 0 })
+  const [loading, setLoading] = useState(true)
 
-  const handleCreateSuccess = () => {
-    alert('จองสำเร็จ!')
+  const fetchReservations = async () => {
+    setLoading(true)
+    const supabase = createClient()
+
+    const { data, error } = await supabase
+      .from('reservations')
+      .select(`
+        id,
+        quantity,
+        status,
+        reserved_at,
+        used_at,
+        stock_item:stock_items!inner (
+          id,
+          lot_number,
+          product:products!inner (
+            name,
+            sku,
+            size
+          )
+        ),
+        case:cases!inner (
+          id,
+          case_number,
+          scheduled_date,
+          patient:patients!inner (
+            full_name
+          ),
+          dentist:profiles (
+            full_name
+          )
+        )
+      `)
+      .order('reserved_at', { ascending: false })
+
+    if (error) {
+      console.error('Error fetching reservations:', error)
+      setLoading(false)
+      return
+    }
+
+    const items = (data || []) as unknown as Reservation[]
+    setReservations(items)
+
+    // Calculate stats
+    const today = new Date().toISOString().split('T')[0]
+    let pending = 0, reserved = 0, usedToday = 0, cancelled = 0
+    items.forEach(r => {
+      if (r.status === 'pending') pending++
+      else if (r.status === 'reserved') reserved++
+      else if (r.status === 'cancelled') cancelled++
+      if (r.status === 'used' && r.used_at?.startsWith(today)) usedToday++
+    })
+
+    setStats({ pending, reserved, usedToday, cancelled })
+    setLoading(false)
   }
 
-  const handleUseReservation = (reservation: (typeof mockReservations)[0]) => {
+  useEffect(() => {
+    fetchReservations()
+  }, [])
+
+  const handleCreateSuccess = () => {
+    fetchReservations()
+  }
+
+  const handleUseReservation = (reservation: Reservation) => {
     setSelectedReservation(reservation)
     setIsUseModalOpen(true)
   }
 
-  const handleConfirmUse = () => {
-    alert(`บันทึกการใช้งาน ${selectedReservation?.product_name} สำเร็จ!`)
+  const handleConfirmUse = async () => {
+    if (!selectedReservation) return
+
+    const supabase = createClient()
+
+    // Update reservation status to used
+    const { error: reservationError } = await supabase
+      .from('reservations')
+      .update({
+        status: 'used',
+        used_at: new Date().toISOString()
+      } as never)
+      .eq('id', selectedReservation.id)
+
+    if (reservationError) {
+      console.error('Error updating reservation:', reservationError)
+      alert('เกิดข้อผิดพลาดในการบันทึก')
+      return
+    }
+
+    // Note: In production, this should use an RPC function to atomically update stock
+    // For now, we just mark the reservation as used
+
     setIsUseModalOpen(false)
     setSelectedReservation(null)
+    fetchReservations()
   }
 
-  const filteredReservations = mockReservations.filter((r) => {
+  const handleCancelReservation = async (reservation: Reservation) => {
+    if (!confirm('ต้องการยกเลิกการจองนี้?')) return
+
+    const supabase = createClient()
+
+    // Update reservation status
+    const { error: reservationError } = await supabase
+      .from('reservations')
+      .update({ status: 'cancelled' } as never)
+      .eq('id', reservation.id)
+
+    if (reservationError) {
+      console.error('Error cancelling reservation:', reservationError)
+      alert('เกิดข้อผิดพลาด')
+      return
+    }
+
+    // Note: In production, this should use an RPC function to atomically update reserved_quantity
+
+    fetchReservations()
+  }
+
+  const filteredReservations = reservations.filter((r) => {
     const matchesSearch =
-      r.case_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.patient_name.includes(searchQuery) ||
-      r.product_name.toLowerCase().includes(searchQuery.toLowerCase())
+      r.case.case_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.case.patient.full_name.includes(searchQuery) ||
+      r.stock_item.product.name.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesStatus = !statusFilter || r.status === statusFilter
-    return matchesSearch && matchesStatus
+    const matchesDate = !dateFilter || r.case.scheduled_date === dateFilter
+    return matchesSearch && matchesStatus && matchesDate
   })
 
   return (
@@ -117,19 +211,19 @@ export default function ReservationsPage() {
       <div className="grid grid-cols-4 gap-4">
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
           <p className="text-sm text-slate-500">รอจอง</p>
-          <p className="text-2xl font-bold text-slate-900 mt-1">5</p>
+          <p className="text-2xl font-bold text-slate-900 mt-1">{stats.pending}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
           <p className="text-sm text-slate-500">จองแล้ว</p>
-          <p className="text-2xl font-bold text-indigo-600 mt-1">12</p>
+          <p className="text-2xl font-bold text-indigo-600 mt-1">{stats.reserved}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
           <p className="text-sm text-slate-500">ใช้แล้ววันนี้</p>
-          <p className="text-2xl font-bold text-emerald-600 mt-1">3</p>
+          <p className="text-2xl font-bold text-emerald-600 mt-1">{stats.usedToday}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
           <p className="text-sm text-slate-500">ยกเลิก</p>
-          <p className="text-2xl font-bold text-red-600 mt-1">1</p>
+          <p className="text-2xl font-bold text-red-600 mt-1">{stats.cancelled}</p>
         </div>
       </div>
 
@@ -152,12 +246,15 @@ export default function ReservationsPage() {
             className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
             <option value="">สถานะทั้งหมด</option>
+            <option value="pending">รอจอง</option>
             <option value="reserved">จองแล้ว</option>
             <option value="used">ใช้แล้ว</option>
             <option value="cancelled">ยกเลิก</option>
           </select>
           <input
             type="date"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
             className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
@@ -165,72 +262,96 @@ export default function ReservationsPage() {
 
       {/* Reservations List */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">เคส</th>
-              <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">สินค้า</th>
-              <th className="text-center px-4 py-3 text-sm font-semibold text-slate-600">จำนวน</th>
-              <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">วันนัด</th>
-              <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">สถานะ</th>
-              <th className="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200">
-            {filteredReservations.map((reservation) => {
-              const status = statusConfig[reservation.status as keyof typeof statusConfig]
-              const StatusIcon = status.icon
-              return (
-                <tr key={reservation.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3">
-                    <div>
-                      <p className="font-medium text-slate-900">{reservation.case_number}</p>
-                      <p className="text-sm text-slate-500">
-                        {reservation.patient_name} • {reservation.dentist_name}
-                      </p>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div>
-                      <p className="font-medium text-slate-900">{reservation.product_name}</p>
-                      <p className="text-sm text-slate-500">LOT: {reservation.lot_number}</p>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className="font-semibold text-slate-900">{reservation.quantity}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="text-slate-600">
-                      {new Date(reservation.scheduled_date).toLocaleDateString('th-TH', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                      })}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${status.className}`}
-                    >
-                      <StatusIcon className="w-3 h-3" />
-                      {status.label}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    {reservation.status === 'reserved' && (
-                      <button
-                        onClick={() => handleUseReservation(reservation)}
-                        className="px-3 py-1 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+          </div>
+        ) : filteredReservations.length === 0 ? (
+          <div className="text-center py-20 text-slate-500">
+            {reservations.length === 0 ? 'ไม่มีรายการจอง' : 'ไม่พบรายการที่ค้นหา'}
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">เคส</th>
+                <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">สินค้า</th>
+                <th className="text-center px-4 py-3 text-sm font-semibold text-slate-600">จำนวน</th>
+                <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">วันนัด</th>
+                <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">สถานะ</th>
+                <th className="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {filteredReservations.map((reservation) => {
+                const status = statusConfig[reservation.status as keyof typeof statusConfig]
+                const StatusIcon = status?.icon || Clock
+                return (
+                  <tr key={reservation.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3">
+                      <div>
+                        <p className="font-medium text-slate-900">{reservation.case.case_number}</p>
+                        <p className="text-sm text-slate-500">
+                          {reservation.case.patient.full_name}
+                          {reservation.case.dentist && ` • ${reservation.case.dentist.full_name}`}
+                        </p>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div>
+                        <p className="font-medium text-slate-900">
+                          {reservation.stock_item.product.name}
+                          {reservation.stock_item.product.size && ` ${reservation.stock_item.product.size}`}
+                        </p>
+                        <p className="text-sm text-slate-500">LOT: {reservation.stock_item.lot_number}</p>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="font-semibold text-slate-900">{reservation.quantity}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-slate-600">
+                        {new Date(reservation.case.scheduled_date).toLocaleDateString('th-TH', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${status?.className || 'bg-slate-100 text-slate-700'}`}
                       >
-                        บันทึกใช้งาน
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+                        <StatusIcon className="w-3 h-3" />
+                        {status?.label || reservation.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-2">
+                        {reservation.status === 'reserved' && (
+                          <>
+                            <button
+                              onClick={() => handleUseReservation(reservation)}
+                              className="px-3 py-1 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+                            >
+                              บันทึกใช้งาน
+                            </button>
+                            <button
+                              onClick={() => handleCancelReservation(reservation)}
+                              className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
+                            >
+                              ยกเลิก
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* Create Reservation Modal */}
@@ -247,16 +368,17 @@ export default function ReservationsPage() {
             <>
               <div className="p-4 bg-slate-50 rounded-lg space-y-2">
                 <p className="text-sm text-slate-600">
-                  <strong>สินค้า:</strong> {selectedReservation.product_name}
+                  <strong>สินค้า:</strong> {selectedReservation.stock_item.product.name}
+                  {selectedReservation.stock_item.product.size && ` ${selectedReservation.stock_item.product.size}`}
                 </p>
                 <p className="text-sm text-slate-600">
-                  <strong>LOT:</strong> {selectedReservation.lot_number}
+                  <strong>LOT:</strong> {selectedReservation.stock_item.lot_number}
                 </p>
                 <p className="text-sm text-slate-600">
                   <strong>จำนวน:</strong> {selectedReservation.quantity} ชิ้น
                 </p>
                 <p className="text-sm text-slate-600">
-                  <strong>เคส:</strong> {selectedReservation.case_number} - {selectedReservation.patient_name}
+                  <strong>เคส:</strong> {selectedReservation.case.case_number} - {selectedReservation.case.patient.full_name}
                 </p>
               </div>
 
@@ -264,14 +386,13 @@ export default function ReservationsPage() {
                 <Camera className="w-12 h-12 text-slate-400 mx-auto mb-2" />
                 <p className="text-slate-600 font-medium">ถ่ายรูป Barcode/สินค้า</p>
                 <p className="text-sm text-slate-500 mt-1">คลิกเพื่ออัพโหลดหรือถ่ายรูป</p>
-                <input type="file" accept="image/*" className="hidden" />
-                <button
-                  type="button"
-                  onClick={() => alert('เลือกไฟล์รูปภาพ...')}
-                  className="mt-4 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200"
+                <input type="file" accept="image/*" className="hidden" id="photo-upload" />
+                <label
+                  htmlFor="photo-upload"
+                  className="mt-4 inline-block px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 cursor-pointer"
                 >
                   เลือกไฟล์
-                </button>
+                </label>
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">

@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { createClient } from '@/lib/supabase/server'
 
-type Case = {
+type CaseData = {
   id: string
   scheduled_date: string
   traffic_light: string
@@ -8,9 +9,7 @@ type Case = {
 }
 
 export async function CaseCalendar() {
-  // TODO: Replace with actual Supabase query after database setup
-  // const supabase = await createClient()
-  // const { data: cases } = await supabase.from('cases').select(...)
+  const supabase = await createClient()
 
   // Get current month
   const now = new Date()
@@ -21,27 +20,28 @@ export async function CaseCalendar() {
   const firstDay = new Date(year, month, 1)
   const lastDay = new Date(year, month + 1, 0)
 
-  // Mock cases data matching calendar page
-  const cases: Case[] = [
-    {
-      id: '1',
-      scheduled_date: '2026-02-04',
-      traffic_light: 'green',
-      patient: { full_name: 'คุณสมศักดิ์ ใจดี' },
-    },
-    {
-      id: '2',
-      scheduled_date: '2026-02-04',
-      traffic_light: 'yellow',
-      patient: { full_name: 'คุณมาลี สุขใจ' },
-    },
-    {
-      id: '3',
-      scheduled_date: '2026-02-05',
-      traffic_light: 'red',
-      patient: { full_name: 'คุณประสิทธิ์ มั่นคง' },
-    },
-  ]
+  // Fetch cases for this month from Supabase
+  const { data: casesData } = await supabase
+    .from('cases')
+    .select(`
+      id,
+      scheduled_date,
+      traffic_light,
+      patient:patients (
+        full_name
+      )
+    `)
+    .gte('scheduled_date', firstDay.toISOString().split('T')[0])
+    .lte('scheduled_date', lastDay.toISOString().split('T')[0])
+    .eq('status', 'scheduled')
+    .order('scheduled_date', { ascending: true })
+
+  const cases: CaseData[] = ((casesData || []) as unknown as CaseData[]).map(c => ({
+    id: c.id,
+    scheduled_date: c.scheduled_date,
+    traffic_light: c.traffic_light,
+    patient: c.patient
+  }))
 
   // Create calendar grid
   const startDayOfWeek = firstDay.getDay()
@@ -60,7 +60,7 @@ export async function CaseCalendar() {
   }
 
   // Group cases by date
-  const casesByDate: Record<number, Case[]> = {}
+  const casesByDate: Record<number, CaseData[]> = {}
   cases.forEach((c) => {
     const day = new Date(c.scheduled_date).getDate()
     if (!casesByDate[day]) casesByDate[day] = []
@@ -158,6 +158,13 @@ export async function CaseCalendar() {
                         {hasRed && (
                           <span className="w-2 h-2 rounded-full bg-red-500" />
                         )}
+                      </div>
+                    )}
+
+                    {/* Case count badge */}
+                    {dayCases.length > 0 && (
+                      <div className="text-xs text-slate-500 mt-1">
+                        {dayCases.length} เคส
                       </div>
                     )}
                   </>

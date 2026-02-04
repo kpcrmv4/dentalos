@@ -1,76 +1,35 @@
 'use client'
 
-import { useState } from 'react'
-import { Package, Plus, Search, AlertTriangle, Download } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Package, Plus, Search, AlertTriangle, Download, Loader2 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 import { ReceiveStockForm } from '@/components/forms/receive-stock-form'
 
-// Mock data for inventory
-const mockInventory = [
-  {
-    id: '1',
-    product: {
-      name: 'Straumann BLT Implant',
-      sku: 'STR-BLT-410',
-      brand: 'Straumann',
-      size: '4.1 x 10mm',
-    },
-    lot_number: 'LOT-2026-001',
-    expiry_date: '2027-06-15',
-    quantity: 10,
-    reserved_quantity: 3,
-    reorder_point: 5,
-    location: 'A-01-01',
-    status: 'normal',
-  },
-  {
-    id: '2',
-    product: {
-      name: 'Nobel Active Implant',
-      sku: 'NB-ACT-350',
-      brand: 'Nobel Biocare',
-      size: '3.5 x 10mm',
-    },
-    lot_number: 'LOT-2026-002',
-    expiry_date: '2027-03-20',
-    quantity: 4,
-    reserved_quantity: 2,
-    reorder_point: 5,
-    location: 'A-01-02',
-    status: 'low',
-  },
-  {
-    id: '3',
-    product: {
-      name: 'Bio-Oss Bone Graft 0.5g',
-      sku: 'BIO-OSS-05',
-      brand: 'Geistlich',
-      size: '0.5g',
-    },
-    lot_number: 'LOT-2026-003',
-    expiry_date: '2026-04-10',
-    quantity: 8,
-    reserved_quantity: 0,
-    reorder_point: 3,
-    location: 'B-02-01',
-    status: 'expiring',
-  },
-  {
-    id: '4',
-    product: {
-      name: 'Osstem TS III Implant',
-      sku: 'OSS-TS3-412',
-      brand: 'Osstem',
-      size: '4.0 x 12mm',
-    },
-    lot_number: 'LOT-2026-004',
-    expiry_date: '2028-01-15',
-    quantity: 15,
-    reserved_quantity: 5,
-    reorder_point: 5,
-    location: 'A-02-01',
-    status: 'normal',
-  },
-]
+interface StockItem {
+  id: string
+  lot_number: string
+  expiry_date: string
+  quantity: number
+  reserved_quantity: number
+  location: string | null
+  status: string
+  product: {
+    id: string
+    name: string
+    sku: string
+    brand: string | null
+    size: string | null
+    category: string
+    reorder_point: number
+  }
+}
+
+interface Stats {
+  total: number
+  normal: number
+  low: number
+  expiring: number
+}
 
 const statusConfig = {
   normal: { label: 'ปกติ', className: 'bg-emerald-100 text-emerald-700' },
@@ -79,23 +38,134 @@ const statusConfig = {
   out: { label: 'หมด', className: 'bg-slate-100 text-slate-700' },
 }
 
+function calculateItemStatus(item: StockItem): 'normal' | 'low' | 'expiring' | 'out' {
+  const available = item.quantity - item.reserved_quantity
+  const expiryDate = new Date(item.expiry_date)
+  const now = new Date()
+  const daysUntilExpiry = Math.floor((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+
+  // Check if out of stock
+  if (available <= 0) return 'out'
+
+  // Check if expiring within 90 days
+  if (daysUntilExpiry <= 90) return 'expiring'
+
+  // Check if below reorder point
+  if (available <= item.product.reorder_point) return 'low'
+
+  return 'normal'
+}
+
 export default function InventoryPage() {
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [inventory, setInventory] = useState<StockItem[]>([])
+  const [stats, setStats] = useState<Stats>({ total: 0, normal: 0, low: 0, expiring: 0 })
+  const [loading, setLoading] = useState(true)
 
-  const handleReceiveSuccess = () => {
-    alert('รับสินค้าเข้าคลังสำเร็จ!')
+  const fetchInventory = async () => {
+    setLoading(true)
+    const supabase = createClient()
+
+    const { data, error } = await supabase
+      .from('stock_items')
+      .select(`
+        id,
+        lot_number,
+        expiry_date,
+        quantity,
+        reserved_quantity,
+        location,
+        status,
+        product:products!inner (
+          id,
+          name,
+          sku,
+          brand,
+          size,
+          category,
+          reorder_point
+        )
+      `)
+      .eq('status', 'active')
+      .order('expiry_date', { ascending: true })
+
+    if (error) {
+      console.error('Error fetching inventory:', error)
+      setLoading(false)
+      return
+    }
+
+    const items = (data || []) as unknown as StockItem[]
+    setInventory(items)
+
+    // Calculate stats
+    let normal = 0, low = 0, expiring = 0
+    items.forEach(item => {
+      const status = calculateItemStatus(item)
+      if (status === 'normal') normal++
+      else if (status === 'low') low++
+      else if (status === 'expiring') expiring++
+    })
+
+    setStats({
+      total: items.length,
+      normal,
+      low,
+      expiring
+    })
+
+    setLoading(false)
   }
 
-  const filteredInventory = mockInventory.filter((item) => {
+  useEffect(() => {
+    fetchInventory()
+  }, [])
+
+  const handleReceiveSuccess = () => {
+    fetchInventory()
+  }
+
+  const handleExport = async () => {
+    // Create CSV content
+    const headers = ['สินค้า', 'SKU', 'ขนาด', 'LOT', 'วันหมดอายุ', 'คงเหลือ', 'จอง', 'ว่าง', 'ตำแหน่ง', 'สถานะ']
+    const rows = inventory.map(item => {
+      const available = item.quantity - item.reserved_quantity
+      const status = calculateItemStatus(item)
+      return [
+        item.product.name,
+        item.product.sku,
+        item.product.size || '-',
+        item.lot_number,
+        item.expiry_date,
+        item.quantity,
+        item.reserved_quantity,
+        available,
+        item.location || '-',
+        statusConfig[status].label
+      ].join(',')
+    })
+
+    const csvContent = [headers.join(','), ...rows].join('\n')
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `inventory-${new Date().toISOString().split('T')[0]}.csv`
+    link.click()
+  }
+
+  const filteredInventory = inventory.filter((item) => {
     const matchesSearch =
       item.product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.product.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.lot_number.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = !statusFilter || item.status === statusFilter
-    return matchesSearch && matchesStatus
+    const matchesCategory = !categoryFilter || item.product.category === categoryFilter
+    const itemStatus = calculateItemStatus(item)
+    const matchesStatus = !statusFilter || itemStatus === statusFilter
+    return matchesSearch && matchesCategory && matchesStatus
   })
 
   return (
@@ -108,7 +178,7 @@ export default function InventoryPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => alert('Export ข้อมูลสต็อก...')}
+            onClick={handleExport}
             className="inline-flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50"
           >
             <Download className="w-5 h-5" />
@@ -132,7 +202,7 @@ export default function InventoryPage() {
               <Package className="w-5 h-5 text-indigo-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-900">156</p>
+              <p className="text-2xl font-bold text-slate-900">{stats.total}</p>
               <p className="text-sm text-slate-500">รายการทั้งหมด</p>
             </div>
           </div>
@@ -143,7 +213,7 @@ export default function InventoryPage() {
               <Package className="w-5 h-5 text-emerald-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-900">142</p>
+              <p className="text-2xl font-bold text-slate-900">{stats.normal}</p>
               <p className="text-sm text-slate-500">สต็อกปกติ</p>
             </div>
           </div>
@@ -154,7 +224,7 @@ export default function InventoryPage() {
               <AlertTriangle className="w-5 h-5 text-amber-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-900">8</p>
+              <p className="text-2xl font-bold text-slate-900">{stats.low}</p>
               <p className="text-sm text-slate-500">ใกล้หมด</p>
             </div>
           </div>
@@ -165,7 +235,7 @@ export default function InventoryPage() {
               <AlertTriangle className="w-5 h-5 text-red-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-900">6</p>
+              <p className="text-2xl font-bold text-slate-900">{stats.expiring}</p>
               <p className="text-sm text-slate-500">ใกล้หมดอายุ</p>
             </div>
           </div>
@@ -193,8 +263,9 @@ export default function InventoryPage() {
             <option value="">หมวดหมู่ทั้งหมด</option>
             <option value="implant">Implant</option>
             <option value="abutment">Abutment</option>
-            <option value="bone-graft">Bone Graft</option>
+            <option value="bone_graft">Bone Graft</option>
             <option value="membrane">Membrane</option>
+            <option value="surgical_kit">Surgical Kit</option>
           </select>
           <select
             value={statusFilter}
@@ -211,66 +282,77 @@ export default function InventoryPage() {
 
       {/* Inventory Table */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">สินค้า</th>
-              <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">LOT / วันหมดอายุ</th>
-              <th className="text-center px-4 py-3 text-sm font-semibold text-slate-600">คงเหลือ</th>
-              <th className="text-center px-4 py-3 text-sm font-semibold text-slate-600">จอง</th>
-              <th className="text-center px-4 py-3 text-sm font-semibold text-slate-600">ว่าง</th>
-              <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">ตำแหน่ง</th>
-              <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">สถานะ</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200">
-            {filteredInventory.map((item) => {
-              const available = item.quantity - item.reserved_quantity
-              const status = statusConfig[item.status as keyof typeof statusConfig]
-              return (
-                <tr key={item.id} className="hover:bg-slate-50 cursor-pointer">
-                  <td className="px-4 py-3">
-                    <div>
-                      <p className="font-medium text-slate-900">{item.product.name}</p>
-                      <p className="text-sm text-slate-500">
-                        {item.product.sku} • {item.product.size}
-                      </p>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div>
-                      <p className="font-mono text-sm text-slate-900">{item.lot_number}</p>
-                      <p className="text-sm text-slate-500">
-                        หมดอายุ: {new Date(item.expiry_date).toLocaleDateString('th-TH')}
-                      </p>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className="font-semibold text-slate-900">{item.quantity}</span>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className="text-amber-600">{item.reserved_quantity}</span>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span
-                      className={`font-semibold ${available <= item.reorder_point ? 'text-red-600' : 'text-emerald-600'}`}
-                    >
-                      {available}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="font-mono text-sm text-slate-600">{item.location}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.className}`}>
-                      {status.label}
-                    </span>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+          </div>
+        ) : filteredInventory.length === 0 ? (
+          <div className="text-center py-20 text-slate-500">
+            {inventory.length === 0 ? 'ไม่มีสินค้าในคลัง' : 'ไม่พบสินค้าที่ค้นหา'}
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">สินค้า</th>
+                <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">LOT / วันหมดอายุ</th>
+                <th className="text-center px-4 py-3 text-sm font-semibold text-slate-600">คงเหลือ</th>
+                <th className="text-center px-4 py-3 text-sm font-semibold text-slate-600">จอง</th>
+                <th className="text-center px-4 py-3 text-sm font-semibold text-slate-600">ว่าง</th>
+                <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">ตำแหน่ง</th>
+                <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">สถานะ</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {filteredInventory.map((item) => {
+                const available = item.quantity - item.reserved_quantity
+                const itemStatus = calculateItemStatus(item)
+                const status = statusConfig[itemStatus]
+                return (
+                  <tr key={item.id} className="hover:bg-slate-50 cursor-pointer">
+                    <td className="px-4 py-3">
+                      <div>
+                        <p className="font-medium text-slate-900">{item.product.name}</p>
+                        <p className="text-sm text-slate-500">
+                          {item.product.sku} {item.product.size ? `• ${item.product.size}` : ''}
+                        </p>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div>
+                        <p className="font-mono text-sm text-slate-900">{item.lot_number}</p>
+                        <p className="text-sm text-slate-500">
+                          หมดอายุ: {new Date(item.expiry_date).toLocaleDateString('th-TH')}
+                        </p>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="font-semibold text-slate-900">{item.quantity}</span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="text-amber-600">{item.reserved_quantity}</span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span
+                        className={`font-semibold ${available <= item.product.reorder_point ? 'text-red-600' : 'text-emerald-600'}`}
+                      >
+                        {available}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="font-mono text-sm text-slate-600">{item.location || '-'}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.className}`}>
+                        {status.label}
+                      </span>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* Receive Stock Modal */}

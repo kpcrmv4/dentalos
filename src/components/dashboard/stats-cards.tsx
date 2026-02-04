@@ -1,11 +1,72 @@
 import { Calendar, Clock, AlertTriangle, Package } from 'lucide-react'
+import { createClient } from '@/lib/supabase/server'
 
 export async function StatsCards() {
-  // Mock data matching calendar page - will be replaced with Supabase queries
-  const monthCases = 3      // 3 cases in February
-  const pendingCases = 2    // 2 cases scheduled (Feb 4 and Feb 5)
-  const redCases = 1        // 1 case with red status (missing materials)
-  const lowStockCount = 3   // Low stock items
+  const supabase = await createClient()
+
+  // Get current month boundaries
+  const now = new Date()
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
+
+  // Fetch all stats in parallel
+  const [
+    monthCasesResult,
+    pendingCasesResult,
+    redCasesResult,
+    lowStockResult,
+  ] = await Promise.all([
+    // Cases this month
+    supabase
+      .from('cases')
+      .select('id', { count: 'exact', head: true })
+      .gte('scheduled_date', startOfMonth)
+      .lte('scheduled_date', endOfMonth),
+
+    // Pending cases (scheduled and upcoming)
+    supabase
+      .from('cases')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'scheduled')
+      .gte('scheduled_date', now.toISOString().split('T')[0]),
+
+    // Red light cases (missing materials)
+    supabase
+      .from('cases')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'scheduled')
+      .eq('traffic_light', 'red'),
+
+    // Low stock items (quantity - reserved_quantity <= reorder_point)
+    supabase
+      .from('stock_items')
+      .select(`
+        id,
+        quantity,
+        reserved_quantity,
+        product:products!inner (
+          reorder_point
+        )
+      `)
+      .eq('status', 'active'),
+  ])
+
+  // Calculate low stock count
+  const stockItems = (lowStockResult.data || []) as unknown as {
+    id: string
+    quantity: number
+    reserved_quantity: number
+    product: { reorder_point: number }
+  }[]
+  const lowStockCount = stockItems.filter(item => {
+    const available = item.quantity - item.reserved_quantity
+    const reorderPoint = item.product?.reorder_point || 5
+    return available <= reorderPoint
+  }).length
+
+  const monthCases = monthCasesResult.count || 0
+  const pendingCases = pendingCasesResult.count || 0
+  const redCases = redCasesResult.count || 0
 
   const stats = [
     {

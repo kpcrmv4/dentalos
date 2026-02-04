@@ -1,48 +1,42 @@
 'use client'
 
-import { useState } from 'react'
-import { ArrowLeftRight, Plus, Search, ArrowRight, ArrowLeft, RotateCcw } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { ArrowLeftRight, Plus, Search, ArrowRight, ArrowLeft, RotateCcw, Loader2, Check } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 import { CreateTransferForm } from '@/components/forms/create-transfer-form'
+import { Modal, Button } from '@/components/ui/modal'
 
-// Mock data for transfers
-const mockTransfers = [
-  {
-    id: '1',
-    transfer_number: 'TR-2026-0001',
-    type: 'borrow',
-    company: 'Straumann Thailand',
-    product_name: 'Straumann BLT Implant 4.5x10mm',
-    quantity: 2,
-    status: 'pending_return',
-    borrowed_at: '2026-01-20',
-    due_date: '2026-02-20',
-    notes: 'ยืมเพื่อ Demo ให้คนไข้',
-  },
-  {
-    id: '2',
-    transfer_number: 'TR-2026-0002',
-    type: 'exchange',
-    company: 'Nobel Biocare Thailand',
-    product_name: 'Nobel Active 3.5x10mm',
-    quantity: 1,
-    status: 'completed',
-    borrowed_at: '2026-01-15',
-    returned_at: '2026-01-25',
-    notes: 'แลกเปลี่ยนขนาด',
-  },
-  {
-    id: '3',
-    transfer_number: 'TR-2026-0003',
-    type: 'return',
-    company: 'Osstem Thailand',
-    product_name: 'Osstem TS III 4.0x8mm',
-    quantity: 3,
-    status: 'in_transit',
-    borrowed_at: null,
-    sent_at: '2026-02-01',
-    notes: 'คืนของใกล้หมดอายุ',
-  },
-]
+interface Transfer {
+  id: string
+  transfer_number: string
+  type: string
+  quantity: number
+  status: string
+  notes: string | null
+  due_date: string | null
+  borrowed_at: string | null
+  returned_at: string | null
+  created_at: string
+  supplier: {
+    id: string
+    name: string
+  }
+  stock_item: {
+    id: string
+    lot_number: string
+    product: {
+      name: string
+      size: string | null
+    }
+  }
+}
+
+interface Stats {
+  borrowed: number
+  pendingReturn: number
+  exchanging: number
+  overdue: number
+}
 
 const typeConfig = {
   borrow: { label: 'ยืม', icon: ArrowLeft, className: 'bg-blue-100 text-blue-700' },
@@ -62,16 +56,99 @@ export default function TransfersPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [transfers, setTransfers] = useState<Transfer[]>([])
+  const [stats, setStats] = useState<Stats>({ borrowed: 0, pendingReturn: 0, exchanging: 0, overdue: 0 })
+  const [loading, setLoading] = useState(true)
 
-  const handleCreateSuccess = () => {
-    alert('สร้างรายการสำเร็จ!')
+  const fetchTransfers = async () => {
+    setLoading(true)
+    const supabase = createClient()
+
+    const { data, error } = await supabase
+      .from('transfers')
+      .select(`
+        id,
+        transfer_number,
+        type,
+        quantity,
+        status,
+        notes,
+        due_date,
+        borrowed_at,
+        returned_at,
+        created_at,
+        supplier:suppliers!inner (
+          id,
+          name
+        ),
+        stock_item:stock_items!inner (
+          id,
+          lot_number,
+          product:products!inner (
+            name,
+            size
+          )
+        )
+      `)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('Error fetching transfers:', error)
+      setLoading(false)
+      return
+    }
+
+    const items = (data || []) as unknown as Transfer[]
+    setTransfers(items)
+
+    // Calculate stats
+    const today = new Date().toISOString().split('T')[0]
+    let borrowed = 0, pendingReturn = 0, exchanging = 0, overdue = 0
+    items.forEach(t => {
+      if (t.type === 'borrow' && t.status !== 'completed') borrowed++
+      if (t.status === 'pending_return') pendingReturn++
+      if (t.type === 'exchange' && t.status !== 'completed') exchanging++
+      if (t.due_date && t.due_date < today && t.status !== 'completed') overdue++
+    })
+
+    setStats({ borrowed, pendingReturn, exchanging, overdue })
+    setLoading(false)
   }
 
-  const filteredTransfers = mockTransfers.filter((transfer) => {
+  useEffect(() => {
+    fetchTransfers()
+  }, [])
+
+  const handleCreateSuccess = () => {
+    fetchTransfers()
+  }
+
+  const handleMarkReturned = async (transfer: Transfer) => {
+    if (!confirm('ยืนยันว่าคืนของแล้ว?')) return
+
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('transfers')
+      .update({
+        status: 'completed',
+        returned_at: new Date().toISOString()
+      } as never)
+      .eq('id', transfer.id)
+
+    if (error) {
+      console.error('Error updating transfer:', error)
+      alert('เกิดข้อผิดพลาด')
+      return
+    }
+
+    fetchTransfers()
+  }
+
+  const filteredTransfers = transfers.filter((transfer) => {
     const matchesSearch =
       transfer.transfer_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      transfer.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      transfer.product_name.toLowerCase().includes(searchQuery.toLowerCase())
+      transfer.supplier.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      transfer.stock_item.product.name.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesType = !typeFilter || transfer.type === typeFilter
     const matchesStatus = !statusFilter || transfer.status === statusFilter
     return matchesSearch && matchesType && matchesStatus
@@ -102,7 +179,7 @@ export default function TransfersPage() {
               <ArrowLeft className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-blue-600">3</p>
+              <p className="text-2xl font-bold text-blue-600">{stats.borrowed}</p>
               <p className="text-sm text-slate-500">ยืมอยู่</p>
             </div>
           </div>
@@ -113,7 +190,7 @@ export default function TransfersPage() {
               <ArrowRight className="w-5 h-5 text-amber-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-amber-600">2</p>
+              <p className="text-2xl font-bold text-amber-600">{stats.pendingReturn}</p>
               <p className="text-sm text-slate-500">รอคืน</p>
             </div>
           </div>
@@ -124,7 +201,7 @@ export default function TransfersPage() {
               <RotateCcw className="w-5 h-5 text-purple-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-purple-600">1</p>
+              <p className="text-2xl font-bold text-purple-600">{stats.exchanging}</p>
               <p className="text-sm text-slate-500">แลกเปลี่ยน</p>
             </div>
           </div>
@@ -135,7 +212,7 @@ export default function TransfersPage() {
               <ArrowLeftRight className="w-5 h-5 text-red-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-red-600">1</p>
+              <p className="text-2xl font-bold text-red-600">{stats.overdue}</p>
               <p className="text-sm text-slate-500">เกินกำหนด</p>
             </div>
           </div>
@@ -181,68 +258,97 @@ export default function TransfersPage() {
 
       {/* Transfers List */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">เลขรายการ</th>
-              <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">ประเภท</th>
-              <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">บริษัท</th>
-              <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">สินค้า</th>
-              <th className="text-center px-4 py-3 text-sm font-semibold text-slate-600">จำนวน</th>
-              <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">กำหนดคืน</th>
-              <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">สถานะ</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200">
-            {filteredTransfers.map((transfer) => {
-              const type = typeConfig[transfer.type as keyof typeof typeConfig]
-              const status = statusConfig[transfer.status as keyof typeof statusConfig]
-              const TypeIcon = type.icon
-              return (
-                <tr key={transfer.id} className="hover:bg-slate-50 cursor-pointer">
-                  <td className="px-4 py-3">
-                    <span className="font-mono font-medium text-indigo-600">{transfer.transfer_number}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${type.className}`}
-                    >
-                      <TypeIcon className="w-3 h-3" />
-                      {type.label}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="font-medium text-slate-900">{transfer.company}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="text-slate-600">{transfer.product_name}</span>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className="font-semibold text-slate-900">{transfer.quantity}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    {transfer.due_date ? (
-                      <span className="text-slate-600">
-                        {new Date(transfer.due_date).toLocaleDateString('th-TH', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+          </div>
+        ) : filteredTransfers.length === 0 ? (
+          <div className="text-center py-20 text-slate-500">
+            {transfers.length === 0 ? 'ไม่มีรายการยืม-คืน' : 'ไม่พบรายการที่ค้นหา'}
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">เลขรายการ</th>
+                <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">ประเภท</th>
+                <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">บริษัท</th>
+                <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">สินค้า</th>
+                <th className="text-center px-4 py-3 text-sm font-semibold text-slate-600">จำนวน</th>
+                <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">กำหนดคืน</th>
+                <th className="text-left px-4 py-3 text-sm font-semibold text-slate-600">สถานะ</th>
+                <th className="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {filteredTransfers.map((transfer) => {
+                const type = typeConfig[transfer.type as keyof typeof typeConfig]
+                const status = statusConfig[transfer.status as keyof typeof statusConfig]
+                const TypeIcon = type?.icon || ArrowLeftRight
+                const today = new Date().toISOString().split('T')[0]
+                const isOverdue = transfer.due_date && transfer.due_date < today && transfer.status !== 'completed'
+
+                return (
+                  <tr key={transfer.id} className={`hover:bg-slate-50 ${isOverdue ? 'bg-red-50' : ''}`}>
+                    <td className="px-4 py-3">
+                      <span className="font-mono font-medium text-indigo-600">{transfer.transfer_number}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${type?.className || 'bg-slate-100 text-slate-700'}`}
+                      >
+                        <TypeIcon className="w-3 h-3" />
+                        {type?.label || transfer.type}
                       </span>
-                    ) : (
-                      <span className="text-slate-400">-</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.className}`}>
-                      {status.label}
-                    </span>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="font-medium text-slate-900">{transfer.supplier.name}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-slate-600">
+                        {transfer.stock_item.product.name}
+                        {transfer.stock_item.product.size && ` ${transfer.stock_item.product.size}`}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="font-semibold text-slate-900">{transfer.quantity}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {transfer.due_date ? (
+                        <span className={`${isOverdue ? 'text-red-600 font-medium' : 'text-slate-600'}`}>
+                          {new Date(transfer.due_date).toLocaleDateString('th-TH', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
+                          {isOverdue && ' (เกินกำหนด)'}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${status?.className || 'bg-slate-100 text-slate-700'}`}>
+                        {status?.label || transfer.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {transfer.status === 'pending_return' && (
+                        <button
+                          onClick={() => handleMarkReturned(transfer)}
+                          className="px-3 py-1 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+                        >
+                          <Check className="w-4 h-4 inline mr-1" />
+                          คืนแล้ว
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* Create Transfer Modal */}

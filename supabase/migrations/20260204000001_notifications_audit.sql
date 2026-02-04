@@ -29,7 +29,7 @@ CREATE POLICY "Users can read own notifications" ON notifications
   USING (
     user_id = auth.uid() OR
     target_user_id = auth.uid() OR
-    target_roles && ARRAY[(SELECT r.name FROM roles r JOIN profiles p ON p.role_id = r.id WHERE p.id = auth.uid())] OR
+    target_roles && ARRAY[(SELECT r.name::TEXT FROM roles r JOIN profiles p ON p.role_id = r.id WHERE p.id = auth.uid())] OR
     (target_user_id IS NULL AND target_roles IS NULL AND user_id IS NULL)
   );
 
@@ -39,7 +39,7 @@ CREATE POLICY "Users can update own notifications" ON notifications
   USING (
     user_id = auth.uid() OR
     target_user_id = auth.uid() OR
-    target_roles && ARRAY[(SELECT r.name FROM roles r JOIN profiles p ON p.role_id = r.id WHERE p.id = auth.uid())]
+    target_roles && ARRAY[(SELECT r.name::TEXT FROM roles r JOIN profiles p ON p.role_id = r.id WHERE p.id = auth.uid())]
   );
 
 -- Users can delete their own notifications
@@ -48,7 +48,7 @@ CREATE POLICY "Users can delete own notifications" ON notifications
   USING (
     user_id = auth.uid() OR
     target_user_id = auth.uid() OR
-    target_roles && ARRAY[(SELECT r.name FROM roles r JOIN profiles p ON p.role_id = r.id WHERE p.id = auth.uid())]
+    target_roles && ARRAY[(SELECT r.name::TEXT FROM roles r JOIN profiles p ON p.role_id = r.id WHERE p.id = auth.uid())]
   );
 
 -- Service role can insert notifications

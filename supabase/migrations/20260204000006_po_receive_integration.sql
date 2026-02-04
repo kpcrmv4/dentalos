@@ -11,10 +11,10 @@
 -- -----------------------------------------------------
 ALTER TABLE stock_items 
 ADD COLUMN IF NOT EXISTS purchase_order_id UUID REFERENCES purchase_orders(id),
-ADD COLUMN IF NOT EXISTS purchase_order_item_id UUID REFERENCES purchase_order_items(id);
+ADD COLUMN IF NOT EXISTS po_item_id UUID REFERENCES po_items(id);
 
 CREATE INDEX IF NOT EXISTS idx_stock_items_po ON stock_items(purchase_order_id);
-CREATE INDEX IF NOT EXISTS idx_stock_items_po_item ON stock_items(purchase_order_item_id);
+CREATE INDEX IF NOT EXISTS idx_stock_items_po_item ON stock_items(po_item_id);
 
 -- -----------------------------------------------------
 -- 2. Function: auto_allocate_received_stock
@@ -204,7 +204,7 @@ BEGIN
   LOOP
     -- ดึงข้อมูล PO item
     SELECT * INTO v_po_item
-    FROM purchase_order_items
+    FROM po_items
     WHERE id = (v_item->>'po_item_id')::UUID;
     
     IF NOT FOUND THEN
@@ -246,7 +246,7 @@ BEGIN
     v_new_stock_items := array_append(v_new_stock_items, v_stock_item_id);
     
     -- อัพเดท quantity_received ใน PO item
-    UPDATE purchase_order_items
+    UPDATE po_items
     SET 
       quantity_received = quantity_received + (v_item->>'quantity_received')::INTEGER
     WHERE id = v_po_item.id;
@@ -273,8 +273,8 @@ BEGIN
       COUNT(*),
       COUNT(*) FILTER (WHERE quantity_received >= quantity_ordered)
     INTO v_total_po_items, v_fully_received_po_items
-    FROM purchase_order_items
-    WHERE purchase_order_id = p_po_id;
+    FROM po_items
+    WHERE po_id = p_po_id;
     
     UPDATE purchase_orders
     SET 
@@ -307,7 +307,7 @@ BEGIN
     'รับของเข้าคลังเสร็จสิ้น',
     format('รับของจาก PO %s เสร็จแล้ว (รับ %s/%s รายการ)', 
       v_po.po_number, v_total_items, 
-      (SELECT COUNT(*) FROM purchase_order_items WHERE purchase_order_id = p_po_id)),
+      (SELECT COUNT(*) FROM po_items WHERE po_id = p_po_id)),
     'purchase_order',
     p_po_id,
     'normal'
@@ -379,7 +379,7 @@ SELECT
   END AS delivery_status
 FROM purchase_orders po
 JOIN suppliers s ON po.supplier_id = s.id
-LEFT JOIN purchase_order_items poi ON po.id = poi.purchase_order_id
+LEFT JOIN po_items poi ON po.id = poi.po_id
 WHERE po.status IN ('sent', 'partial_received')
 GROUP BY po.id, s.name, s.code
 ORDER BY 
@@ -424,10 +424,10 @@ BEGIN
     (poi.quantity_ordered - poi.quantity_received) AS quantity_pending,
     poi.unit_price,
     c.has_expiry
-  FROM purchase_order_items poi
+  FROM po_items poi
   JOIN products p ON poi.product_id = p.id
   JOIN categories c ON p.category_id = c.id
-  WHERE poi.purchase_order_id = p_po_id
+  WHERE poi.po_id = p_po_id
     AND poi.quantity_received < poi.quantity_ordered
   ORDER BY p.name;
 END;
@@ -459,7 +459,7 @@ WHERE status = 'pending';
 
 CREATE INDEX IF NOT EXISTS idx_cases_surgery_date ON cases(surgery_date);
 
-CREATE INDEX IF NOT EXISTS idx_po_items_pending ON purchase_order_items(purchase_order_id) 
+CREATE INDEX IF NOT EXISTS idx_po_items_pending ON po_items(po_id) 
 WHERE quantity_received < quantity_ordered;
 
 -- =====================================================

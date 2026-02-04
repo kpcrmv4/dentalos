@@ -236,8 +236,9 @@ const TimelineItem = memo(function TimelineItem({
             วัสดุ: {caseData.items_ready}/{caseData.total_items_reserved} รายการพร้อม
           </div>
         ) : (
-          <div className="text-sm text-orange-500 mt-1">
-            ⚠️ ยังไม่ได้จองวัสดุ
+          <div className="text-sm text-orange-500 mt-1 flex items-center gap-1">
+            <AlertTriangle className="w-3 h-3" />
+            <span>ยังไม่ได้จองวัสดุ</span>
           </div>
         )}
       </div>

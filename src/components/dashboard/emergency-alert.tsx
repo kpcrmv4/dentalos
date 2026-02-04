@@ -42,10 +42,10 @@ export function EmergencyAlert() {
         scheduled_date,
         scheduled_time,
         traffic_light,
-        patient:patients(name),
+        patient:patients!cases_patient_id_fkey(full_name),
         dentist:profiles!cases_dentist_id_fkey(full_name)
       `)
-      .eq('traffic_light', 'red')
+      .in('traffic_light', ['red', 'gray'])
       .eq('status', 'scheduled')
       .gte('scheduled_date', now.toISOString().split('T')[0])
       .lte('scheduled_date', in48Hours.toISOString().split('T')[0])
@@ -62,7 +62,7 @@ export function EmergencyAlert() {
           case_number: c.case_number,
           scheduled_date: c.scheduled_date,
           scheduled_time: c.scheduled_time,
-          patient_name: c.patient?.name || 'ไม่ระบุ',
+          patient_name: c.patient?.full_name || 'ไม่ระบุ',
           dentist_name: c.dentist?.full_name || 'ไม่ระบุ',
           hours_until: hoursUntil
         }
@@ -106,7 +106,7 @@ export function EmergencyAlert() {
               </span>
             </h3>
             <p className="text-sm text-red-700 mt-1">
-              มีเคสที่วัสดุยังไม่พร้อมภายใน 48 ชั่วโมง
+              มีเคสที่วัสดุยังไม่พร้อมหรือยังไม่ได้จองภายใน 48 ชั่วโมง
             </p>
           </div>
         </div>

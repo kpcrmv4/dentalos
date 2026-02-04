@@ -129,9 +129,10 @@ export function CaseCalendar() {
   const getTrafficLightText = (light: string) => {
     switch (light) {
       case 'green': return 'วัสดุพร้อม'
-      case 'yellow': return 'รอยืนยัน'
+      case 'yellow': return 'รอของเข้า'
       case 'red': return 'วัสดุไม่พร้อม'
-      default: return 'ไม่ระบุ'
+      case 'gray': return 'ยังไม่จอง'
+      default: return 'ยังไม่จอง'
     }
   }
 
@@ -158,11 +159,15 @@ export function CaseCalendar() {
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-amber-500" />
-                รอยืนยัน
+                รอของเข้า
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-red-500" />
                 ไม่พร้อม
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-slate-400" />
+                ยังไม่จอง
               </span>
             </div>
           </div>
@@ -216,6 +221,7 @@ export function CaseCalendar() {
                   const hasGreen = dayCases.some((c) => c.traffic_light === 'green')
                   const hasRed = dayCases.some((c) => c.traffic_light === 'red')
                   const hasYellow = dayCases.some((c) => c.traffic_light === 'yellow')
+                  const hasGray = dayCases.some((c) => c.traffic_light === 'gray' || !c.traffic_light)
                   const dayOfWeek = (startDayOfWeek + (day || 0) - 1) % 7
 
                   return (
@@ -252,6 +258,9 @@ export function CaseCalendar() {
                               )}
                               {hasRed && (
                                 <span className="w-2 h-2 rounded-full bg-red-500" />
+                              )}
+                              {hasGray && (
+                                <span className="w-2 h-2 rounded-full bg-slate-400" />
                               )}
                             </div>
                           )}

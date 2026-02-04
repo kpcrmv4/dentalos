@@ -283,9 +283,9 @@ BEGIN
         WHEN v_fully_received_po_items > 0 THEN 'partial_received'
         ELSE status
       END,
-      actual_delivery_date = CASE
-        WHEN v_fully_received_po_items >= v_total_po_items THEN CURRENT_DATE
-        ELSE actual_delivery_date
+      received_at = CASE
+        WHEN v_fully_received_po_items >= v_total_po_items THEN NOW()
+        ELSE received_at
       END,
       updated_at = NOW()
     WHERE id = p_po_id;
@@ -360,8 +360,8 @@ CREATE OR REPLACE VIEW pending_purchase_orders AS
 SELECT 
   po.id,
   po.po_number,
-  po.order_date,
-  po.expected_delivery_date,
+  po.ordered_at,
+  po.expected_at,
   po.status,
   s.name AS supplier_name,
   s.code AS supplier_code,
@@ -369,12 +369,11 @@ SELECT
   COUNT(poi.id) FILTER (WHERE poi.quantity_received >= poi.quantity_ordered) AS received_items,
   SUM(poi.quantity_ordered) AS total_quantity_ordered,
   SUM(poi.quantity_received) AS total_quantity_received,
-  po.total,
-  po.line_message_sent,
+  po.total_amount,
   CASE 
-    WHEN po.expected_delivery_date < CURRENT_DATE THEN 'overdue'
-    WHEN po.expected_delivery_date = CURRENT_DATE THEN 'today'
-    WHEN po.expected_delivery_date <= CURRENT_DATE + INTERVAL '3 days' THEN 'soon'
+    WHEN po.expected_at < CURRENT_DATE THEN 'overdue'
+    WHEN po.expected_at = CURRENT_DATE THEN 'today'
+    WHEN po.expected_at <= CURRENT_DATE + INTERVAL '3 days' THEN 'soon'
     ELSE 'normal'
   END AS delivery_status
 FROM purchase_orders po
@@ -384,11 +383,11 @@ WHERE po.status IN ('sent', 'partial_received')
 GROUP BY po.id, s.name, s.code
 ORDER BY 
   CASE 
-    WHEN po.expected_delivery_date < CURRENT_DATE THEN 1
-    WHEN po.expected_delivery_date = CURRENT_DATE THEN 2
+    WHEN po.expected_at < CURRENT_DATE THEN 1
+    WHEN po.expected_at = CURRENT_DATE THEN 2
     ELSE 3
   END,
-  po.expected_delivery_date ASC;
+  po.expected_at ASC;
 
 -- -----------------------------------------------------
 -- 6. Function: get_po_items_for_receive

@@ -10,7 +10,8 @@ import {
   Package, 
   CheckCircle,
   AlertTriangle,
-  XCircle
+  XCircle,
+  HelpCircle
 } from 'lucide-react';
 
 // Dynamic imports for icons used in interactive sections
@@ -181,21 +182,22 @@ const CaseRow = memo(function CaseRow({
       <td className="px-4 py-3 text-sm">{caseData.treatment_type}</td>
       <td className="px-4 py-3 text-sm">{caseData.tooth_number}</td>
       <td className="px-4 py-3 text-center">
-        <div className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${getTrafficLightColor(caseData.traffic_light_status)}`}>
+        <div className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${getTrafficLightColor(caseData.traffic_light_status)}`} title={caseData.traffic_light_status === 'gray' ? 'ยังไม่ได้จองวัสดุ' : caseData.traffic_light_status === 'green' ? 'วัสดุพร้อม' : caseData.traffic_light_status === 'yellow' ? 'รอวัสดุเข้า' : 'วัสดุไม่พอ'}>
           {caseData.traffic_light_status === 'green' && <CheckCircle className="w-4 h-4 text-white" />}
           {caseData.traffic_light_status === 'yellow' && <AlertTriangle className="w-4 h-4 text-white" />}
           {caseData.traffic_light_status === 'red' && <XCircle className="w-4 h-4 text-white" />}
+          {caseData.traffic_light_status === 'gray' && <HelpCircle className="w-4 h-4 text-white" />}
         </div>
       </td>
       <td className="px-4 py-3 text-center text-sm">
         {caseData.reservation_count > 0 ? (
           <span className="text-green-600">{caseData.items_ready}/{caseData.total_items_reserved}</span>
         ) : (
-          <span className="text-gray-400">-</span>
+          <span className="text-gray-400">ยังไม่จอง</span>
         )}
       </td>
       <td className="px-4 py-3 text-center">
-        <a href={`/cases/${caseData.case_id}`} className="p-1.5 hover:bg-gray-100 rounded inline-block">
+        <a href={`/reservations/new?case_id=${caseData.case_id}`} className="p-1.5 hover:bg-gray-100 rounded inline-block" title="จองวัสดุ">
           <Eye className="w-4 h-4 text-gray-600" />
         </a>
       </td>
@@ -229,15 +231,19 @@ const TimelineItem = memo(function TimelineItem({
         <div className="text-sm text-gray-600 mt-1">
           {caseData.treatment_type} - ซี่ {caseData.tooth_number}
         </div>
-        {caseData.reservation_count > 0 && (
+        {caseData.reservation_count > 0 ? (
           <div className="text-sm text-gray-500 mt-1">
             วัสดุ: {caseData.items_ready}/{caseData.total_items_reserved} รายการพร้อม
+          </div>
+        ) : (
+          <div className="text-sm text-orange-500 mt-1">
+            ⚠️ ยังไม่ได้จองวัสดุ
           </div>
         )}
       </div>
       <div className="flex-shrink-0">
-        <a href={`/cases/${caseData.case_id}`} className="px-3 py-1.5 bg-white border rounded-lg text-sm hover:bg-gray-50">
-          ดูรายละเอียด
+        <a href={`/reservations/new?case_id=${caseData.case_id}`} className="px-3 py-1.5 bg-white border rounded-lg text-sm hover:bg-gray-50">
+          {caseData.reservation_count > 0 ? 'ดูรายละเอียด' : 'จองวัสดุ'}
         </a>
       </div>
     </div>
@@ -282,6 +288,7 @@ export function DentistDashboardClient({ initialData }: { initialData: InitialDa
       case 'green': return 'bg-green-500';
       case 'yellow': return 'bg-yellow-500';
       case 'red': return 'bg-red-500';
+      case 'gray': return 'bg-gray-400';
       default: return 'bg-gray-400';
     }
   }, []);
@@ -291,6 +298,7 @@ export function DentistDashboardClient({ initialData }: { initialData: InitialDa
       case 'green': return 'bg-green-50 border-green-200';
       case 'yellow': return 'bg-yellow-50 border-yellow-200';
       case 'red': return 'bg-red-50 border-red-200';
+      case 'gray': return 'bg-gray-50 border-gray-200';
       default: return 'bg-gray-50 border-gray-200';
     }
   }, []);
@@ -323,7 +331,8 @@ export function DentistDashboardClient({ initialData }: { initialData: InitialDa
       cases,
       green: cases.filter(c => c.traffic_light_status === 'green').length,
       yellow: cases.filter(c => c.traffic_light_status === 'yellow').length,
-      red: cases.filter(c => c.traffic_light_status === 'red').length
+      red: cases.filter(c => c.traffic_light_status === 'red').length,
+      gray: cases.filter(c => c.traffic_light_status === 'gray').length
     }));
   }, [sortedDateEntries]);
 
@@ -500,9 +509,17 @@ export function DentistDashboardClient({ initialData }: { initialData: InitialDa
                         <p className="text-xs text-gray-400">{formatDate(c.surgery_date)}</p>
                       </div>
                     </div>
-                    <span className={`px-2 py-1 text-xs rounded-full ${getPriorityBadge(c.priority)}`}>
-                      {c.priority === 'high' ? 'ด่วน' : c.priority === 'medium' ? 'ปานกลาง' : 'ปกติ'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-1 text-xs rounded-full ${getPriorityBadge(c.priority)}`}>
+                        {c.priority === 'high' ? 'ด่วน' : c.priority === 'medium' ? 'ปานกลาง' : 'ปกติ'}
+                      </span>
+                      <a
+                        href={`/reservations/new?case_id=${c.case_id}`}
+                        className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                      >
+                        จัดการ
+                      </a>
+                    </div>
                   </div>
                 </div>
               ))
@@ -593,6 +610,10 @@ export function DentistDashboardClient({ initialData }: { initialData: InitialDa
               <div className="w-3 h-3 rounded-full bg-red-500" />
               {calendarSummary.red_cases} ไม่พร้อม
             </span>
+            <span className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded-full bg-gray-400" />
+              {(calendarSummary as { gray_cases?: number }).gray_cases || 0} ยังไม่จอง
+            </span>
           </div>
         )}
 
@@ -643,7 +664,7 @@ export function DentistDashboardClient({ initialData }: { initialData: InitialDa
                 ไม่มีเคสในช่วงเวลานี้
               </div>
             ) : (
-              timelineStats.map(({ date, cases, green, yellow, red }) => (
+              timelineStats.map(({ date, cases, green, yellow, red, gray }) => (
                 <div key={date} className="border rounded-lg overflow-hidden">
                   <div className="bg-gray-100 px-4 py-2 flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -668,6 +689,12 @@ export function DentistDashboardClient({ initialData }: { initialData: InitialDa
                         <span className="flex items-center gap-1 text-xs">
                           <div className="w-2 h-2 rounded-full bg-red-500" />
                           {red}
+                        </span>
+                      )}
+                      {gray > 0 && (
+                        <span className="flex items-center gap-1 text-xs">
+                          <div className="w-2 h-2 rounded-full bg-gray-400" />
+                          {gray}
                         </span>
                       )}
                     </div>

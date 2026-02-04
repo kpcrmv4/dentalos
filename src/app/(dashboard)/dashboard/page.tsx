@@ -1,6 +1,7 @@
 import { Suspense } from 'react'
 import { StatsCards } from '@/components/dashboard/stats-cards'
 import { DashboardClient } from '@/components/dashboard/dashboard-client'
+import { EmergencyAlert } from '@/components/dashboard/emergency-alert'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export default async function DashboardPage() {
@@ -13,6 +14,9 @@ export default async function DashboardPage() {
           <p className="text-slate-500">ยินดีต้อนรับ, ผู้ดูแลระบบ</p>
         </div>
       </div>
+
+      {/* Emergency Alert - Cases within 48 hours with red status */}
+      <EmergencyAlert />
 
       {/* Stats Cards */}
       <Suspense fallback={<StatsCardsSkeleton />}>

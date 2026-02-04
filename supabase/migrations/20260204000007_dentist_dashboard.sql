@@ -487,9 +487,9 @@ TO authenticated
 USING (
   dentist_id = auth.uid() OR
   EXISTS (
-    SELECT 1 FROM user_roles ur
-    JOIN roles r ON ur.role_id = r.id
-    WHERE ur.user_id = auth.uid()
+    SELECT 1 FROM profiles p
+    JOIN roles r ON p.role_id = r.id
+    WHERE p.id = auth.uid()
     AND r.name IN ('admin', 'cs', 'inventory')
   )
 );

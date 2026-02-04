@@ -57,22 +57,25 @@ BEGIN
   END IF;
   
   -- ดึง Reservations ที่รอสินค้านี้ (FIFO)
+  -- Note: reservations เชื่อมกับ stock_item_id โดยตรง ไม่มี product_id
+  -- ต้อง join กับ stock_items เพื่อดึง product_id
   FOR v_reservation IN
-    SELECT r.*, c.surgery_date
+    SELECT r.*, c.scheduled_date as surgery_date
     FROM reservations r
     JOIN cases c ON r.case_id = c.id
-    WHERE r.product_id = v_stock_item.product_id
-      AND r.status = 'pending'
-      AND r.quantity_needed > 0
+    JOIN stock_items si ON r.stock_item_id = si.id
+    WHERE si.product_id = v_stock_item.product_id
+      AND r.status = 'reserved'
+      AND r.quantity > 0
     ORDER BY 
-      c.surgery_date ASC,  -- เคสที่ผ่าตัดเร็วกว่าได้ก่อน
-      r.created_at ASC     -- ถ้าวันเดียวกัน ใครจองก่อนได้ก่อน
+      c.scheduled_date ASC,  -- เคสที่ผ่าตัดเร็วกว่าได้ก่อน
+      r.reserved_at ASC     -- ถ้าวันเดียวกัน ใครจองก่อนได้ก่อน
   LOOP
     -- ถ้าของหมดแล้ว ออกจาก loop
     EXIT WHEN v_remaining_quantity <= 0;
     
     -- คำนวณจำนวนที่จะจัดสรร
-    v_allocate_quantity := LEAST(v_reservation.quantity_needed, v_remaining_quantity);
+    v_allocate_quantity := LEAST(v_reservation.quantity, v_remaining_quantity);
     
     -- สร้าง reservation_item
     INSERT INTO reservation_items (
@@ -87,15 +90,10 @@ BEGIN
       NOW()
     );
     
-    -- อัพเดท reservation
+    -- อัพเดท reservation status
     UPDATE reservations
     SET 
-      quantity_allocated = quantity_allocated + v_allocate_quantity,
-      status = CASE 
-        WHEN quantity_allocated + v_allocate_quantity >= quantity_needed THEN 'confirmed'
-        ELSE 'partial'
-      END,
-      updated_at = NOW()
+      status = 'reserved'
     WHERE id = v_reservation.id;
     
     -- อัพเดท stock_item
@@ -137,7 +135,8 @@ BEGIN
       END
     FROM cases c
     JOIN patients pat ON c.patient_id = pat.id
-    JOIN products p ON v_reservation.product_id = p.id
+    JOIN stock_items si ON v_reservation.stock_item_id = si.id
+    JOIN products p ON si.product_id = p.id
     WHERE c.id = v_reservation.case_id;
     
   END LOOP;
@@ -453,10 +452,10 @@ WITH CHECK (
 -- -----------------------------------------------------
 -- 8. Indexes for Performance
 -- -----------------------------------------------------
-CREATE INDEX IF NOT EXISTS idx_reservations_pending ON reservations(product_id, status) 
-WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_reservations_status ON reservations(status) 
+WHERE status = 'reserved';
 
-CREATE INDEX IF NOT EXISTS idx_cases_surgery_date ON cases(surgery_date);
+CREATE INDEX IF NOT EXISTS idx_cases_scheduled_date ON cases(scheduled_date);
 
 CREATE INDEX IF NOT EXISTS idx_po_items_pending ON po_items(po_id) 
 WHERE quantity_received < quantity_ordered;

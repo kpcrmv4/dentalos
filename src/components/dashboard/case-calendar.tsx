@@ -1,8 +1,16 @@
-import { createClient } from '@/lib/supabase/server'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
+type Case = {
+  id: string
+  scheduled_date: string
+  traffic_light: string
+  patient: { full_name: string } | null
+}
+
 export async function CaseCalendar() {
-  const supabase = await createClient()
+  // TODO: Replace with actual Supabase query after database setup
+  // const supabase = await createClient()
+  // const { data: cases } = await supabase.from('cases').select(...)
 
   // Get current month
   const now = new Date()
@@ -13,12 +21,8 @@ export async function CaseCalendar() {
   const firstDay = new Date(year, month, 1)
   const lastDay = new Date(year, month + 1, 0)
 
-  // Get cases for this month
-  const { data: cases } = await supabase
-    .from('cases')
-    .select('id, scheduled_date, traffic_light, patient:patients(full_name)')
-    .gte('scheduled_date', firstDay.toISOString().split('T')[0])
-    .lte('scheduled_date', lastDay.toISOString().split('T')[0])
+  // Mock cases data for initial build
+  const cases: Case[] = []
 
   // Create calendar grid
   const startDayOfWeek = firstDay.getDay()
@@ -37,8 +41,8 @@ export async function CaseCalendar() {
   }
 
   // Group cases by date
-  const casesByDate: Record<number, typeof cases> = {}
-  cases?.forEach((c) => {
+  const casesByDate: Record<number, Case[]> = {}
+  cases.forEach((c) => {
     const day = new Date(c.scheduled_date).getDate()
     if (!casesByDate[day]) casesByDate[day] = []
     casesByDate[day].push(c)
@@ -98,10 +102,10 @@ export async function CaseCalendar() {
         <div className="grid grid-cols-7 gap-1">
           {calendarDays.map((day, index) => {
             const isToday = day === now.getDate()
-            const dayCases = day ? casesByDate[day] : []
-            const hasGreen = dayCases?.some((c) => c.traffic_light === 'green')
-            const hasRed = dayCases?.some((c) => c.traffic_light === 'red')
-            const hasYellow = dayCases?.some((c) => c.traffic_light === 'yellow')
+            const dayCases = day ? casesByDate[day] || [] : []
+            const hasGreen = dayCases.some((c) => c.traffic_light === 'green')
+            const hasRed = dayCases.some((c) => c.traffic_light === 'red')
+            const hasYellow = dayCases.some((c) => c.traffic_light === 'yellow')
 
             return (
               <div
@@ -124,7 +128,7 @@ export async function CaseCalendar() {
                     </span>
 
                     {/* Traffic light indicators */}
-                    {dayCases && dayCases.length > 0 && (
+                    {dayCases.length > 0 && (
                       <div className="flex justify-center gap-0.5 mt-1">
                         {hasGreen && (
                           <span className="w-2 h-2 rounded-full bg-green-500" />

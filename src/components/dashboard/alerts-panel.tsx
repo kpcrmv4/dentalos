@@ -1,35 +1,32 @@
-import { createClient } from '@/lib/supabase/server'
 import { ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 
-export async function AlertsPanel() {
-  const supabase = await createClient()
+// Mock data for initial build (replace with Supabase query after DB setup)
+type StockItem = {
+  id: string
+  quantity: number
+  reserved_quantity: number
+  product: {
+    id: string
+    name: string
+    ref_code: string
+    reorder_point: number
+  } | null
+}
 
-  // Get low stock items with details
-  const { data: stockItems } = await supabase
-    .from('stock_items')
-    .select(`
-      id,
-      quantity,
-      reserved_quantity,
-      product:products(
-        id,
-        name,
-        ref_code,
-        reorder_point
-      )
-    `)
-    .eq('status', 'active')
-    .order('quantity', { ascending: true })
-    .limit(10)
+export async function AlertsPanel() {
+  // TODO: Replace with actual Supabase query after database setup
+  // const supabase = await createClient()
+  // const { data: stockItems } = await supabase.from('stock_items').select(...)
+
+  const stockItems: StockItem[] = []
 
   // Filter for low stock
-  const lowStockItems = stockItems?.filter((item) => {
+  const lowStockItems = stockItems.filter((item) => {
     const available = item.quantity - item.reserved_quantity
-    const product = item.product as { reorder_point: number } | null
-    const reorderPoint = product?.reorder_point || 5
+    const reorderPoint = item.product?.reorder_point || 5
     return available <= reorderPoint
-  }) || []
+  })
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 h-full">

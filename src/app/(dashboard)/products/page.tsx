@@ -922,7 +922,7 @@ export default function ProductsPage() {
           {/* Expiry Note */}
           {selectedCategory && !selectedCategory.has_expiry && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-700">
-              <strong>หมายเหตุ:</strong> หมวดหมู่ "{selectedCategory.name}" ไม่ต้องระบุวันหมดอายุเมื่อรับเข้าคลัง
+              <strong>หมายเหตุ:</strong> หมวดหมู่ &ldquo;{selectedCategory.name}&rdquo; ไม่ต้องระบุวันหมดอายุเมื่อรับเข้าคลัง
             </div>
           )}
 

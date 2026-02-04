@@ -56,9 +56,10 @@ const ExpiryBadge = memo(function ExpiryBadge({
 }: { 
   daysUntilExpiry: number | null 
 }) {
-  if (daysUntilExpiry === null) return null;
-
   const config = useMemo(() => {
+    if (daysUntilExpiry === null) {
+      return null;
+    }
     if (daysUntilExpiry <= 30) {
       return { className: 'bg-red-100 text-red-700', label: `หมดอายุใน ${daysUntilExpiry} วัน` };
     }
@@ -67,6 +68,8 @@ const ExpiryBadge = memo(function ExpiryBadge({
     }
     return { className: 'bg-slate-100 text-slate-600', label: `หมดอายุใน ${daysUntilExpiry} วัน` };
   }, [daysUntilExpiry]);
+
+  if (!config) return null;
 
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full ${config.className}`}>

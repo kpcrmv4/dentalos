@@ -17,6 +17,7 @@ import {
   X,
   Boxes,
   Bell,
+  Stethoscope,
 } from 'lucide-react'
 import { useMobileSidebar } from './mobile-sidebar-context'
 
@@ -32,6 +33,7 @@ interface SidebarProps {
 
 const menuItems = [
   { href: '/dashboard', label: 'ภาพรวม', icon: LayoutDashboard },
+  { href: '/dentist-dashboard', label: 'Dashboard ทันตแพทย์', icon: Stethoscope, roles: ['dentist'] },
   { href: '/calendar', label: 'ปฏิทินเคสผ่าตัด', icon: Calendar },
   { href: '/patients', label: 'รายชื่อคนไข้', icon: Users },
   { href: '/inventory', label: 'สต็อกวัสดุและรากเทียม', icon: Package },
